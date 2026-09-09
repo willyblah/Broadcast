@@ -1,0 +1,16 @@
+**/node_modules/
+**/bin/
+**/obj/
+**/dist/
+**/.vinext/
+**/.next/
+**/.env
+**/.env.*
+!**/.env.example
+**/appsettings.local.json
+artifacts/
+.DS_Store
+.tools/
+*.log
+*.tsbuildinfo
+supabase/.temp/

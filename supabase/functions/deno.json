@@ -1,0 +1,7 @@
+{
+  "compilerOptions": { "strict": true },
+  "tasks": {
+    "check": "deno check broadcast-api/index.ts",
+    "test": "deno test ../tests/domain_test.ts"
+  }
+}

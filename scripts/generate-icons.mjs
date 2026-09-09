@@ -1,0 +1,14 @@
+import sharp from '../apps/teacher/node_modules/sharp/lib/index.js';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+const root = new URL('../', import.meta.url);
+const source = await readFile(new URL('apps/teacher/public/favicon.svg', root));
+for (const size of [192, 512]) await sharp(source).resize(size, size).png().toFile(new URL(`apps/teacher/public/icon-${size}.png`, root).pathname);
+const assets = new URL('apps/classroom/Broadcast.Classroom/Assets/', root);
+await mkdir(assets, { recursive: true });
+const png = await sharp(source).resize(256, 256).png().toBuffer();
+await writeFile(new URL('icon.png', assets), png);
+const header = Buffer.alloc(22);
+header.writeUInt16LE(1, 2); header.writeUInt16LE(1, 4);
+header.writeUInt16LE(1, 10); header.writeUInt16LE(32, 12);
+header.writeUInt32LE(png.length, 14); header.writeUInt32LE(22, 18);
+await writeFile(new URL('app.ico', assets), Buffer.concat([header, png]));
