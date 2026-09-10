@@ -49,12 +49,12 @@ h1,h2,p { margin: 0; } h1 { font-size: 23px; letter-spacing: -.6px; font-weight:
 .selected-count { font-size: 14px; color: #5f6c80; } .selected-count strong { color: #2563eb; font-weight: 600; }
 .send-actions { display: flex; gap: 10px; } .action { height: 44px; padding: 0 17px; font-size: 15px; gap: 8px; border-radius: 10px; }
 .primary { background: #2563eb; color: white; border: 1px solid #2563eb; } .primary:hover:not(:disabled) { background: #1c50c5; }
-.action:disabled { opacity: .5; } .listen { background: #fff; }
+.action:disabled { opacity: .5; }
 .feedback { display: flex; align-items: center; gap: 9px; padding: 13px 15px; margin: 0 0 20px; border-radius: 10px; font-size: 14px; line-height: 1.6; }
 .feedback button { margin-left: auto; background: none; border: 0; padding: 0; display: flex; align-items: center; }
 .config-notice { color: #516078; background: #eaf0f7; }
 .feedback.error { background: #fff0f0; color: #ae3030; } .feedback.warning { background: #fff4de; color: #85601f; } .feedback.info { background: #eaf2ff; color: #2659b7; }
-.error-text { color: #b52929; } .preview-player { display: block; width: 100%; height: 42px; margin-top: 15px; }
+.error-text { color: #b52929; }
 .broadcast-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 16px; text-align: left; }
 .receipts { margin-top: 16px; border-top: 1px solid #e8ecf2; } .receipt-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 13px 0; border-bottom: 1px solid #edf0f5; font-size: 14px; }
 .receipt-class { display: flex; align-items: center; gap: 8px; min-width: 68px; font-size: 16px; font-weight: 550; }
@@ -83,7 +83,7 @@ h1,h2,p { margin: 0; } h1 { font-size: 23px; letter-spacing: -.6px; font-weight:
   .section-heading { margin-bottom: 15px; } h1 { font-size: 21px; } .section { margin-bottom: 22px; }
   .composer, .delivery-panel, .devices-panel { padding: 18px; border-radius: 14px; } .broadcast-input { min-height: 140px; padding: 12px; font-size: 16px; }
   .composer-bottom { flex-direction: column; align-items: stretch; gap: 13px; margin-top: 13px; } .send-actions { width: 100%; } .send-actions .primary { flex: 1; }
-  .action { height: 46px; } .listen { flex: .65; } .selected-count { font-size: 14px; }
+  .action { height: 46px; } .selected-count { font-size: 14px; }
   .receipt-offline { width: 100%; text-align: right; } .history-summary { padding: 18px; } .history-detail { padding: 0 18px 18px; }
 }
 @media(prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }

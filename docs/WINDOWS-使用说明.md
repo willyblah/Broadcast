@@ -1,20 +1,20 @@
 # 教室端使用说明
 
-适用于 Windows 10 22H2 / Windows 11 x64。电脑需要正常登录桌面，并能访问 Supabase 的 HTTPS、WebSocket 和音频地址。
+适用于 Windows 10 22H2 / Windows 11 x64。电脑需要正常登录桌面，并能访问 Supabase 的 HTTPS、WebSocket 以及腾讯云 TTS 地址。
 
 ## 首次运行
 
 1. 将压缩包解压到固定目录，例如 `C:\SchoolBroadcast`。程序会从这个位置登录自启，完成绑定后不要随意移动 EXE。
-2. 在同目录的 `appsettings.json` 中填写 Supabase 地址、公钥及管理员登录邮箱。邮箱由部署人员预先配置，老师和教室管理员只需输入密码。
+2. 在同目录的 `appsettings.json` 中填写 Supabase 地址、公钥、管理员登录邮箱，以及腾讯云 `SecretId`、`SecretKey`、地域、音色等语音配置。邮箱和云端参数由部署人员预先配置，老师和教室管理员只需输入密码。
 3. 双击 `Broadcast.Classroom.exe`。不需要安装 .NET，也不需要以 Windows 管理员身份运行。
 4. 输入广播系统的管理员密码，选择这台电脑所属班级，点击“绑定并开始接收”。已被其他电脑绑定的班级不可选。
 5. 程序进入托盘，后续随当前 Windows 用户登录自动运行。正常接收无需保持设置窗口打开。
 
-EXE 内包含 .NET 和 Avalonia 所需运行文件。首次运行会把原生运行库解压到用户临时目录，这是单文件自包含程序的正常行为。`appsettings.json` 是可编辑配置文件，不是额外运行时依赖。
+EXE 内包含 .NET 和 Avalonia 所需运行文件。首次运行会把原生运行库解压到用户临时目录，这是单文件自包含程序的正常行为。`appsettings.json` 是可编辑配置文件，不是额外运行时依赖。它包含腾讯云密钥，应限制读取权限，不要发送给无关人员。
 
 ## 日常运行
 
-- 收到有效广播后，全屏显示正文并播放语音。播放完成后再停留 3 秒。
+- 收到有效广播后，全屏显示正文，由本机直接调用腾讯云生成并播放语音。音频不从 Supabase 下载；播放完成后再停留 3 秒。
 - 广播按顺序播放；发送后 30 秒仍未开始的广播直接作废，包括因前一条播放较长而超时的排队广播。
 - 语音不可用时仍显示正文，通常自显示起共 10 秒；如果声音在播放一段时间后才失败，正文至少保留至 10 秒，不会撤回已经显示的内容。
 - 掉线后自动重连。重新上线只处理有效期内且没有开始处理过的广播。
@@ -28,6 +28,6 @@ EXE 内包含 .NET 和 Avalonia 所需运行文件。首次运行会把原生运
 - 配置文件有变更时退出并重新启动。可使用 `appsettings.local.json` 完整覆盖同目录的基础配置。
 - 配置尚未填写时关闭设置窗口会退出程序；填写后重新打开即可。
 
-设备凭据使用当前 Windows 用户的 DPAPI 加密，存放在 `%LOCALAPPDATA%\BroadcastClassroom\device.session`。不要复制此文件到其他账号或电脑。故障日志为同目录 `client.log`；回执暂存文件不包含管理员密码或腾讯云密钥。
+Supabase 设备登录凭据使用当前 Windows 用户的 DPAPI 加密，存放在 `%LOCALAPPDATA%\BroadcastClassroom\device.session`。不要复制此文件到其他账号或电脑。腾讯云凭据保存在程序旁的 `appsettings.json`。故障日志为同目录 `client.log`；回执暂存文件不包含管理员密码或腾讯云密钥。
 
 若要卸载，先解绑并退出，然后删除程序目录，并从 Windows“启动应用”禁用 `BroadcastClassroom`。对应自启项位于当前用户注册表 `Software\Microsoft\Windows\CurrentVersion\Run`。

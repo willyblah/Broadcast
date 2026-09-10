@@ -22,13 +22,12 @@ async function delivery(id: string, classroom = '8-1') { await identity(admin, '
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
-    create schema auth; create schema storage;
+    create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.jwt() returns jsonb language sql stable as $$select nullif(current_setting('request.jwt.claims', true), '')::jsonb$$;
     create function auth.uid() returns uuid language sql stable as $$select (auth.jwt()->>'sub')::uuid$$;
     create function auth.role() returns text language sql stable as $$select auth.jwt()->>'role'$$;
     grant usage on schema auth, public to authenticated, anon, service_role;
-    create table storage.buckets(id text primary key, name text, public boolean);
     create publication supabase_realtime;
     insert into auth.users values ('${admin}'),('${first}'),('${second}'),('${third}');`);
   await db.exec(await readFile(new URL('../../../supabase/migrations/202609080001_broadcast.sql', import.meta.url), 'utf8'));
@@ -75,7 +74,14 @@ describe('database contract and RLS (real PostgreSQL engine)', () => {
   });
   it('cannot write another classroom receipt', async () => { const id = await create(['8-2']); const did = await delivery(id, '8-2'); await identity(first); await expect(db.query("select ack_delivery($1,'received',clock_timestamp())", [did])).rejects.toThrow('无权'); });
   it('blocks direct writes that could forge online or playback state', async () => { await identity(first); await expect(db.query('update devices set connected=true')).rejects.toThrow('permission denied'); await expect(db.query('update deliveries set played_at=clock_timestamp()')).rejects.toThrow('permission denied'); });
-  it('records real device heartbeats', async () => { await identity(first); expect((await scalar<{ active: boolean }>('select device_heartbeat(true)')).active).toBe(true); await identity(admin, 'admin'); const status = await scalar<{ classrooms: {id:string;connected:boolean}[] }>('select classroom_status()'); expect(status.classrooms.find(c => c.id === '8-1')?.connected).toBe(true); });
+  it('records heartbeats and expires them after 50 seconds', async () => {
+    await identity(first); expect((await scalar<{ active: boolean }>('select device_heartbeat(true)')).active).toBe(true);
+    await identity(admin, 'admin'); let status = await scalar<{ classrooms: {id:string;connected:boolean}[] }>('select classroom_status()');
+    expect(status.classrooms.find(c => c.id === '8-1')?.connected).toBe(true);
+    await db.exec('reset role'); await db.query("update devices set last_seen_at=clock_timestamp()-interval '50 seconds' where id=$1", [first]);
+    await identity(admin, 'admin'); status = await scalar<{ classrooms: {id:string;connected:boolean}[] }>('select classroom_status()');
+    expect(status.classrooms.find(c => c.id === '8-1')?.connected).toBe(false);
+  });
   it('invalidates old-class messages after rebind and does not transfer them to replacement devices', async () => {
     const id = await create(); const did = await delivery(id);
     await db.query('select bind_device($1,$2,$3)', [first, '8-3', 'moved']);

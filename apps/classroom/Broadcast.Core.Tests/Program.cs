@@ -81,7 +81,7 @@ static async Task Happy()
 }
 static async Task TextOnly()
 {
-    await using var h = new Harness(); h.Backend.Items = [h.Item("text") with { AudioId = null }];
+    await using var h = new Harness(); h.Backend.Items = [h.Item("text")]; h.Speech.Fail = true;
     await h.Start(); await Until(() => h.Display.Hidden == 1); await h.Outbox.FlushAsync(h.Backend, default);
     Check(h.Display.Shown.Single() == "text"); Check(h.Audio.Played == 0);
     Check(h.Delays.Single().TotalSeconds is > 9 and <= 10);
@@ -112,7 +112,7 @@ static async Task Duplicates()
     await Until(() => h.Display.Hidden == 1); await h.Queue.SyncAsync(default); await Task.Delay(30);
     Check(h.Display.Shown.Count == 1);
     using var life = new CancellationTokenSource();
-    var restarted = new DeliveryQueue(h.Backend, h.Display, h.Audio, h.Outbox, h.Clock, (_, _) => Task.CompletedTask);
+    var restarted = new DeliveryQueue(h.Backend, h.Display, h.Speech, h.Audio, h.Outbox, h.Clock, (_, _) => Task.CompletedTask);
     await restarted.SyncAsync(default); var task = restarted.RunAsync(life.Token); await Task.Delay(30);
     life.Cancel(); try { await task; } catch (OperationCanceledException) { }
     Check(h.Display.Shown.Count == 1);
@@ -139,17 +139,17 @@ static async Task DisplayFailure()
 
 sealed class Harness : IAsyncDisposable
 {
-    public readonly FakeBackend Backend = new(); public readonly FakeDisplay Display = new(); public readonly FakeAudio Audio = new();
+    public readonly FakeBackend Backend = new(); public readonly FakeDisplay Display = new(); public readonly FakeSpeech Speech = new(); public readonly FakeAudio Audio = new();
     public readonly ServerClock Clock = new(); public readonly ConcurrentBag<TimeSpan> Delays = []; public readonly ConcurrentBag<Exception> Errors = [];
     public readonly string Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "broadcast-tests-" + Guid.NewGuid(), "outbox.json");
     public readonly ReceiptOutbox Outbox; public readonly DeliveryQueue Queue;
     private readonly CancellationTokenSource _life = new(); private Task? _task;
     public Harness()
     {
-        Outbox = new(Path); Queue = new(Backend, Display, Audio, Outbox, Clock, (span, _) => { Delays.Add(span); return Task.CompletedTask; });
+        Outbox = new(Path); Queue = new(Backend, Display, Speech, Audio, Outbox, Clock, (span, _) => { Delays.Add(span); return Task.CompletedTask; });
         Queue.Error += Errors.Add;
     }
-    public Delivery Item(string body) => new(Guid.NewGuid(), Guid.NewGuid(), body, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddSeconds(30), "audio", null);
+    public Delivery Item(string body) => new(Guid.NewGuid(), Guid.NewGuid(), body, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddSeconds(30));
     public async Task Start() { await Queue.SyncAsync(_life.Token); _task = Queue.RunAsync(_life.Token); }
     public async ValueTask DisposeAsync()
     {
@@ -165,7 +165,6 @@ sealed class FakeBackend : IBackend
     public Task<bool> ClaimAsync(Guid id, CancellationToken ct)
     { if (FailClaim) { FailClaim = false; throw new IOException("offline"); } return Task.FromResult(Claims.TryAdd(id, 0)); }
     public Task AcknowledgeAsync(Receipt r, CancellationToken ct) { Receipts.Enqueue(r); return Task.CompletedTask; }
-    public Task<byte[]> DownloadAudioAsync(Guid id, CancellationToken ct) => Task.FromResult(new byte[] { 1 });
 }
 sealed class FakeDisplay : IDisplay
 {
@@ -178,4 +177,11 @@ sealed class FakeAudio : IAudioPlayer
     public int Played; public bool Fail; public TaskCompletionSource? Gate;
     public async Task PlayAsync(byte[] audio, Action started, CancellationToken ct)
     { if (Fail) throw new IOException("no device"); Interlocked.Increment(ref Played); started(); if (Gate is not null) await Gate.Task.WaitAsync(ct); }
+}
+sealed class FakeSpeech : ISpeechSynthesizer
+{
+    public bool Fail;
+    public Task<byte[]> SynthesizeAsync(string text, CancellationToken ct) => Fail
+        ? Task.FromException<byte[]>(new InvalidOperationException("tts failed"))
+        : Task.FromResult(new byte[] { 1 });
 }

@@ -60,11 +60,6 @@ public sealed class BackendClient(ServiceConfig config, AuthSession? session = n
     public Task<bool> ClaimAsync(Guid id, CancellationToken ct) => RpcAsync<bool>("start_delivery", new { p_delivery = id }, ct);
     public async Task AcknowledgeAsync(Receipt receipt, CancellationToken ct) =>
         await RpcAsync<JsonElement>("ack_delivery", new { p_delivery = receipt.DeliveryId, p_event = receipt.Event, p_at = receipt.At, p_error = receipt.Error }, ct);
-    public async Task<byte[]> DownloadAudioAsync(Guid deliveryId, CancellationToken ct)
-    {
-        var link = await ApiAsync<AudioLink>(new { action = "audio-url", delivery_id = deliveryId }, ct);
-        return await _http.GetByteArrayAsync(link.Url, ct);
-    }
     private async Task<T> RequestAsync<T>(string path, object input, string? token, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, Config.SupabaseUrl.TrimEnd('/') + "/" + path);

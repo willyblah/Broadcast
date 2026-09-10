@@ -8,6 +8,11 @@ output="$repo_root/artifacts/windows-x64"
 "$dotnet_bin" publish "$repo_root/apps/classroom/Broadcast.Classroom/Broadcast.Classroom.csproj" \
   -c Release -r win-x64 --self-contained true -o "$output" \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
+config="$repo_root/apps/classroom/Broadcast.Classroom/appsettings.json"
+if [[ -f "$repo_root/apps/classroom/Broadcast.Classroom/appsettings.local.json" ]]; then
+  config="$repo_root/apps/classroom/Broadcast.Classroom/appsettings.local.json"
+fi
+cp "$config" "$output/appsettings.json"
 cp "$repo_root/docs/WINDOWS-使用说明.md" "$output/README.zh-CN.md"
 cd "$repo_root/artifacts"
 rm -f ".Broadcast.Classroom-win-x64.tmp.zip"

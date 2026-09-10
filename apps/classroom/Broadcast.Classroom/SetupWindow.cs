@@ -44,7 +44,7 @@ internal sealed class SetupWindow : Window
         _content.Children.Add(Heading(_exitOnly ? "退出校园广播" : _existing is null ? "设置这间教室" : "管理教室设备"));
         if (!_config.IsConfigured)
         {
-            _content.Children.Add(Note("广播服务尚未配置。请填写程序旁 appsettings.json 中的服务地址和公钥，然后重新启动。"));
+            _content.Children.Add(Note("广播服务尚未配置。请填写程序旁 appsettings.json 中的 Supabase 和腾讯云语音配置，然后重新启动。"));
             var close = ActionButton("关闭"); close.Click += (_, _) => Close(); _content.Children.Add(close); return;
         }
         _content.Children.Add(Note(notice ?? "输入管理员密码后，选择这台电脑所属的班级。"));

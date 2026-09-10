@@ -1,6 +1,6 @@
 namespace Broadcast.Core;
 
-public sealed class DeliveryQueue(IBackend backend, IDisplay display, IAudioPlayer audio, ReceiptOutbox outbox,
+public sealed class DeliveryQueue(IBackend backend, IDisplay display, ISpeechSynthesizer speech, IAudioPlayer audio, ReceiptOutbox outbox,
     ServerClock clock, Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
     private readonly SemaphoreSlim _signal = new(0, 1);
@@ -79,15 +79,14 @@ public sealed class DeliveryQueue(IBackend backend, IDisplay display, IAudioPlay
             var played = false;
             try
             {
-                if (item.AudioId is null) throw new InvalidOperationException(item.TtsError ?? "语音不可用");
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(TimeSpan.FromSeconds(5));
-                var bytes = await backend.DownloadAudioAsync(item.DeliveryId, timeout.Token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                var bytes = await speech.SynthesizeAsync(item.Body, timeout.Token);
                 await audio.PlayAsync(bytes, () => Report("playing"), ct);
                 Report("played"); played = true;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception) { Report("audio_failed", "语音合成、下载或播放失败"); }
+            catch (Exception) { Report("audio_failed", "语音合成或播放失败"); }
             var remaining = played ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10) - System.Diagnostics.Stopwatch.GetElapsedTime(shownAt);
             if (remaining > TimeSpan.Zero) await _delay(remaining, ct);
             Report("finished");

@@ -9,10 +9,19 @@ public static class Json
     { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower, WriteIndented = true };
 }
 
-public sealed record ServiceConfig(string SupabaseUrl = "", string SupabaseAnonKey = "", string AdminEmail = "admin@broadcast.local")
+public sealed record TencentTtsConfig(string SecretId = "", string SecretKey = "", string Region = "ap-guangzhou",
+    int VoiceType = 101001, int ModelType = 1, int SampleRate = 16000, int Speed = 0, int Volume = 0)
 {
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(SecretId) && !string.IsNullOrWhiteSpace(SecretKey)
+        && !string.IsNullOrWhiteSpace(Region);
+}
+public sealed record ServiceConfig(string SupabaseUrl = "", string SupabaseAnonKey = "", string AdminEmail = "admin@broadcast.local",
+    TencentTtsConfig? TencentTts = null)
+{
+    public TencentTtsConfig Tts => TencentTts ?? new();
     public bool IsConfigured => Uri.TryCreate(SupabaseUrl, UriKind.Absolute, out var uri)
-        && (uri.Scheme == "https" || (uri.Scheme == "http" && uri.IsLoopback)) && !string.IsNullOrWhiteSpace(SupabaseAnonKey);
+        && (uri.Scheme == "https" || (uri.Scheme == "http" && uri.IsLoopback))
+        && !string.IsNullOrWhiteSpace(SupabaseAnonKey) && Tts.IsConfigured;
 }
 public sealed record AuthUser(string Id, Dictionary<string, JsonElement> AppMetadata);
 public sealed record AuthSession(string AccessToken, string RefreshToken, long ExpiresAt, AuthUser User, int ExpiresIn = 3600);
@@ -22,8 +31,7 @@ public sealed record ClassroomStatus(DateTimeOffset ServerNow, Classroom[] Class
 public sealed record Heartbeat(bool Active, string? ClassroomId, DateTimeOffset ServerNow);
 public sealed record PendingBatch(DateTimeOffset ServerNow, Delivery[] Items);
 public sealed record Delivery(Guid DeliveryId, Guid BroadcastId, string Body, DateTimeOffset CreatedAt,
-    DateTimeOffset ExpiresAt, string? AudioId, string? TtsError);
-public sealed record AudioLink(string Url);
+    DateTimeOffset ExpiresAt);
 public sealed record Receipt(Guid DeliveryId, string Event, DateTimeOffset At, string? Error = null);
 
 public sealed class ServerClock
@@ -40,7 +48,6 @@ public interface IBackend
     Task<PendingBatch> PendingAsync(CancellationToken ct);
     Task<bool> ClaimAsync(Guid id, CancellationToken ct);
     Task AcknowledgeAsync(Receipt receipt, CancellationToken ct);
-    Task<byte[]> DownloadAudioAsync(Guid deliveryId, CancellationToken ct);
 }
 public interface IDisplay
 {
@@ -50,4 +57,8 @@ public interface IDisplay
 public interface IAudioPlayer
 {
     Task PlayAsync(byte[] audio, Action started, CancellationToken ct);
+}
+public interface ISpeechSynthesizer
+{
+    Task<byte[]> SynthesizeAsync(string text, CancellationToken ct);
 }

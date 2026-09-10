@@ -17,9 +17,5 @@ site_url = "http://localhost:5173"
 enable_signup = false
 jwt_expiry = 3600
 
-[storage]
-enabled = true
-file_size_limit = "20MiB"
-
 [functions.broadcast-api]
 verify_jwt = false

@@ -12,11 +12,11 @@ export interface Delivery {
 }
 export interface Broadcast {
   id: string; body: string; created_at: string; expires_at: string;
-  audio_id: string | null; tts_error: string | null; source_id: string | null;
+  source_id: string | null;
   deliveries: Delivery[];
 }
 export function isOnline(room: Classroom, now: number): boolean {
-  return !!room.device_id && room.connected && !!room.last_seen_at && now - Date.parse(room.last_seen_at) < 25_000;
+  return !!room.device_id && room.connected && !!room.last_seen_at && now - Date.parse(room.last_seen_at) < 50_000;
 }
 export function deliveryStatus(d: Delivery, b: Broadcast, now: number): { label: string; tone: string } {
   if (d.played_at) return { label: '已播放', tone: 'success' };

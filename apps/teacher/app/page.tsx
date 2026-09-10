@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { ArrowLeft, ArrowUpRight, AudioLines, Check, ChevronRight, Clock3, Headphones, LogOut, Radio, Send, Settings2, Square, WifiOff, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, AudioLines, Check, ChevronRight, Clock3, LogOut, Radio, Send, Settings2, Square, WifiOff, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -34,8 +34,6 @@ export default function App() {
   const [network, setNetwork] = useState(navigator.onLine);
   const [now, setNow] = useState(Date.now);
   const clock = useRef({ server: 0, local: 0 });
-  const [preview, setPreview] = useState<{ body: string; url: string; expires_at: string } | null>(null);
-  const player = useRef<HTMLAudioElement>(null);
   const [confirmRoom, setConfirmRoom] = useState<Classroom | null>(null);
   const sw = useRegisterSW();
   const userId = session?.user.id;
@@ -111,29 +109,18 @@ export default function App() {
       setPassword('');
     });
   }
-  async function listen() {
-    await run('preview', async () => {
-      if (preview?.body === body.trim() && Date.parse(preview.expires_at) > Date.now() + 5000) {
-        await player.current?.play(); return;
-      }
-      const result = await api<{ url: string; expires_at: string }>({ action: 'preview', body });
-      setPreview({ ...result, body: body.trim() });
-      setNotice('语音已准备好，点击播放器试听');
-    });
-  }
   async function send() {
     if (!validDraft(body, selected)) return;
     await run('send', async () => {
-      player.current?.pause();
       const fingerprint = JSON.stringify([body.trim(), [...selected].sort(), sourceId]);
       let attempt: { fingerprint: string; id: string } | null = null;
       try { attempt = JSON.parse(localStorage.getItem('broadcast-attempt') || 'null'); } catch { /* Ignore invalid local storage. */ }
       if (attempt?.fingerprint !== fingerprint) attempt = { fingerprint, id: crypto.randomUUID() };
       localStorage.setItem('broadcast-attempt', JSON.stringify(attempt));
-      const result = await api<{ id: string; tts_error: string | null }>({ action: 'send', request_id: attempt.id, body, classrooms: selected, source_id: sourceId });
+      const result = await api<{ id: string }>({ action: 'send', request_id: attempt.id, body, classrooms: selected, source_id: sourceId });
       localStorage.removeItem('broadcast-attempt');
       setLatestId(result.id); setSourceId(null);
-      setNotice(result.tts_error || '广播已发出，正在等待教室回执');
+      setNotice('广播已发出，正在等待教室回执');
       await getHistory(null, result.id).then(mergeHistory).catch(() => setError('广播已创建，回执暂时无法读取，请检查历史记录'));
     });
   }
@@ -189,9 +176,7 @@ export default function App() {
         </section>
         <section className="section composer"><div className="section-heading"><h2>广播内容</h2><span className={'character-count ' + (length > 300 ? 'error-text' : '')}>{length} / 300</span></div>
           <Textarea className="broadcast-input" aria-label="广播内容" placeholder="输入需要广播的内容…" value={body} onChange={e => setBody(e.target.value)} />
-          {preview && preview.body === body.trim() && <audio ref={player} className="preview-player" controls src={preview.url} preload="none" onError={() => { setPreview(null); setError('试听音频无法播放，请重新生成试听'); }}><track kind="captions" srcLang="zh" label="广播正文" default src={'data:text/vtt;charset=utf-8,' + encodeURIComponent('WEBVTT\n\n00:00:00.000 --> 01:00:00.000\n' + preview.body)} /></audio>}
           <div className="composer-bottom"><span className="selected-count">{selected.length ? <>已选择 <strong>{selected.length}</strong> 个班级</> : '请选择接收班级'}</span><div className="send-actions">
-            <Button variant="outline" className="action listen" onClick={() => void listen()} disabled={!ready || !!busy || !body.trim() || length > 300}><Headphones size={18} />{busy === 'preview' ? '生成中…' : '试听'}</Button>
             <Button className="action primary" onClick={() => void send()} disabled={!ready || !!busy || !validDraft(body, selected)}><Send size={17} />{busy === 'send' ? '发送中…' : '发送广播'}</Button>
           </div></div>
         </section>

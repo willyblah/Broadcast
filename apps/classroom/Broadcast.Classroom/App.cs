@@ -15,6 +15,7 @@ public sealed class App : Application
     private IClassicDesktopStyleApplicationLifetime _desktop = null!;
     private ServiceConfig _config = new();
     private BackendClient? _backend;
+    private TencentSpeechSynthesizer? _speech;
     private SetupWindow? _settings;
     private TrayIcon? _tray;
     private CancellationTokenSource? _receiverLife;
@@ -71,9 +72,10 @@ public sealed class App : Application
     {
         await StopAsync();
         _backend = new BackendClient(_config, session); _backend.SessionChanged += LocalState.SaveSession;
+        _speech = new TencentSpeechSynthesizer(_config.Tts);
         var clock = new ServerClock();
         var outbox = new ReceiptOutbox(Path.Combine(LocalState.Folder, "receipts-" + session.User.Id + ".json"));
-        var queue = new DeliveryQueue(_backend, new BroadcastDisplay(), new AudioPlayer(), outbox, clock);
+        var queue = new DeliveryQueue(_backend, new BroadcastDisplay(), _speech, new AudioPlayer(), outbox, clock);
         var receiver = new ReceiverService(_backend, queue, outbox, clock);
         receiver.StatusChanged += state => Dispatcher.UIThread.Post(() => { if (_tray is not null) _tray.ToolTipText = "校园广播 · " + state; });
         receiver.Error += LocalState.Log;
@@ -90,6 +92,7 @@ public sealed class App : Application
             try { await _receiverTask; } catch (OperationCanceledException) { } catch (Exception e) { LocalState.Log(e); }
         }
         _receiverLife?.Dispose(); _receiverLife = null; _receiverTask = null;
+        _speech?.Dispose(); _speech = null;
         _backend?.Dispose(); _backend = null;
         if (_tray is not null) _tray.ToolTipText = "校园广播 · 尚未绑定";
     }

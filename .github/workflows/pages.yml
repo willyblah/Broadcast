@@ -1,0 +1,50 @@
+name: Deploy teacher app to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/teacher/package-lock.json
+      - uses: actions/configure-pages@v6
+      - run: npm ci
+        working-directory: apps/teacher
+      - run: npm test && npm run lint && npm run build
+        working-directory: apps/teacher
+        env:
+          VITE_BASE_PATH: /Broadcast/
+          VITE_SUPABASE_URL: https://kmuuixuiipqxzeyoawap.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_LfKWm1jk37OYX8kMjxLOPA_45l4if6a
+          VITE_ADMIN_EMAIL: admin@broadcast.local
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/teacher/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

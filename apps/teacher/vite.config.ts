@@ -4,18 +4,21 @@ import tailwindcss from '@tailwindcss/postcss';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
 
+const base = process.env.VITE_BASE_PATH || '/';
+
 export default defineConfig({
+  base,
   plugins: [react(), VitePWA({
     registerType: 'prompt',
     includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
     manifest: {
       name: '校园广播', short_name: '校园广播', lang: 'zh-CN',
       description: '向教室发送广播并查看接收与播放情况',
-      start_url: '/', scope: '/', display: 'standalone',
+      start_url: base, scope: base, display: 'standalone',
       theme_color: '#2563eb', background_color: '#f5f7fa',
-      icons: [192, 512].map(size => ({ src: '/icon-' + size + '.png', sizes: size + 'x' + size, type: 'image/png', purpose: 'any' })),
+      icons: [192, 512].map(size => ({ src: base + 'icon-' + size + '.png', sizes: size + 'x' + size, type: 'image/png', purpose: 'any' })),
     },
-    workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'], navigateFallback: '/index.html', cleanupOutdatedCaches: true },
+    workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'], navigateFallback: base + 'index.html', cleanupOutdatedCaches: true },
   })],
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
   css: { postcss: { plugins: [tailwindcss()] } },
