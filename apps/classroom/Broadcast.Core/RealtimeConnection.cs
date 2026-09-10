@@ -11,7 +11,7 @@ public sealed class RealtimeConnection(BackendClient backend)
     {
         using var life = CancellationTokenSource.CreateLinkedTokenSource(ct);
         using var socket = new ClientWebSocket();
-        socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+        socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(60);
         var uri = new UriBuilder(backend.Config.SupabaseUrl) { Scheme = backend.Config.SupabaseUrl.StartsWith("https:") ? "wss" : "ws",
             Path = "/realtime/v1/websocket", Query = "apikey=" + Uri.EscapeDataString(backend.Config.SupabaseAnonKey) + "&vsn=1.0.0" };
         await socket.ConnectAsync(uri.Uri, ct);
@@ -35,7 +35,7 @@ public sealed class RealtimeConnection(BackendClient backend)
             var sequence = 0;
             while (!ct.IsCancellationRequested)
             {
-                var delay = Task.Delay(TimeSpan.FromSeconds(20), ct);
+                var delay = Task.Delay(TimeSpan.FromSeconds(60), ct);
                 if (await Task.WhenAny(receiveTask, delay) == receiveTask) { await receiveTask; throw new IOException("实时连接已关闭"); }
                 await delay;
                 var currentToken = await backend.AccessTokenAsync(ct);
