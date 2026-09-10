@@ -59,7 +59,10 @@ public sealed class BackendClient(ServiceConfig config, AuthSession? session = n
     public Task<PendingBatch> PendingAsync(CancellationToken ct) => RpcAsync<PendingBatch>("pending_broadcasts", new { }, ct);
     public Task<bool> ClaimAsync(Guid id, CancellationToken ct) => RpcAsync<bool>("start_delivery", new { p_delivery = id }, ct);
     public async Task AcknowledgeAsync(Receipt receipt, CancellationToken ct) =>
-        await RpcAsync<JsonElement>("ack_delivery", new { p_delivery = receipt.DeliveryId, p_event = receipt.Event, p_at = receipt.At, p_error = receipt.Error }, ct);
+        await RequestVoidAsync("rest/v1/rpc/ack_delivery",
+            new { p_delivery = receipt.DeliveryId, p_event = receipt.Event, p_at = receipt.At, p_error = receipt.Error },
+            await AccessTokenAsync(ct), ct);
+
     private async Task<T> RequestAsync<T>(string path, object input, string? token, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, Config.SupabaseUrl.TrimEnd('/') + "/" + path);
@@ -74,14 +77,39 @@ public sealed class BackendClient(ServiceConfig config, AuthSession? session = n
             try
             {
                 using var error = JsonDocument.Parse(text);
-                foreach (var field in new[] { "error_description", "message", "error" })
+                foreach (var field in new[] { "error_description", "msg", "message", "error" })
+                    if (error.RootElement.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.String)
+                    { detail = value.GetString()!; break; }
+            }
+            catch (JsonException) { }
+            if (detail == "Invalid login credentials") detail = "管理员密码错误";
+            throw new BackendException(detail, response.StatusCode);
+        }
+        return JsonSerializer.Deserialize<T>(text, Json.Options)!;
+    }
+
+    private async Task RequestVoidAsync(string path, object input, string? token, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, Config.SupabaseUrl.TrimEnd('/') + "/" + path);
+        request.Headers.Add("apikey", Config.SupabaseAnonKey);
+        if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = new StringContent(JsonSerializer.Serialize(input, Json.Options), Encoding.UTF8, "application/json");
+        using var response = await _http.SendAsync(request, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            string detail = "连接服务失败，请稍后重试";
+            try
+            {
+                using var error = JsonDocument.Parse(text);
+                foreach (var field in new[] { "error_description", "msg", "message", "error" })
                     if (error.RootElement.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.String)
                     { detail = value.GetString()!; break; }
             }
             catch (JsonException) { }
             throw new BackendException(detail, response.StatusCode);
         }
-        return JsonSerializer.Deserialize<T>(text, Json.Options)!;
     }
+
     public void Dispose() { _http.Dispose(); _refresh.Dispose(); }
 }

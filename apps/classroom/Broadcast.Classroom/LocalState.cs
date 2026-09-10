@@ -45,7 +45,7 @@ internal static class LocalState
         lock (Folder)
         {
             if (File.Exists(path) && new FileInfo(path).Length > 1_000_000) File.Move(path, path + ".previous", true);
-            File.AppendAllText(path, DateTimeOffset.Now.ToString("O") + " " + error.GetType().Name + ": " + error.Message + Environment.NewLine);
+            File.AppendAllText(path, DateTimeOffset.Now.ToString("O") + " " + error + Environment.NewLine);
         }
     }
 }

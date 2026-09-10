@@ -106,6 +106,10 @@ public sealed class TencentSpeechSynthesizer(TencentTtsConfig config) : ISpeechS
             if (!foundData) throw new InvalidOperationException("音频内容为空");
         }
         if (format is null || data.Count == 0) throw new InvalidOperationException("音频内容为空");
+        if (format.Length < 12) throw new InvalidOperationException("音频格式无效");
+        var leadIn = new byte[checked((int)BinaryPrimitives.ReadUInt32LittleEndian(format.AsSpan(8, 4)))];
+        if (leadIn.Length == 0) throw new InvalidOperationException("音频格式无效");
+        data.Insert(0, leadIn);
         var formatLength = format.Length + format.Length % 2;
         var audioLength = data.Sum(chunk => chunk.Length);
         var result = new byte[checked(28 + formatLength + audioLength + audioLength % 2)];
