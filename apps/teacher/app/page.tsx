@@ -71,6 +71,7 @@ export default function App() {
   useEffect(() => {
     if (!userId || !supabase || !network) return;
     let disposed = false;
+    const historyRequests = new Map<string, number>();
     const load = async () => {
       try {
         await refreshRooms();
@@ -83,7 +84,15 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'classrooms' }, () => { void refreshRooms().catch(e => setError(message(e))); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, payload => {
         const id = (payload.new as { broadcast_id?: string }).broadcast_id;
-        if (id) void getHistory(null, id).then(mergeHistory).catch(e => setError(message(e)));
+        if (id) {
+          const request = (historyRequests.get(id) ?? 0) + 1;
+          historyRequests.set(id, request);
+          void getHistory(null, id).then(items => {
+            if (!disposed && historyRequests.get(id) === request) mergeHistory(items);
+          }).catch(e => {
+            if (!disposed && historyRequests.get(id) === request) setError(message(e));
+          });
+        }
       })
       .subscribe(status => {
         if (disposed) return;
