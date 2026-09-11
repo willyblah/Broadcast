@@ -73,22 +73,35 @@ public sealed class DeliveryQueue(IBackend backend, IDisplay display, ISpeechSyn
     {
         try
         {
-            await display.ShowAsync(item.Body, ct);
+            await display.ShowAsync(item, ct);
             Report("displayed");
             var shownAt = System.Diagnostics.Stopwatch.GetTimestamp();
             var played = false;
-            try
+            if (item.RepeatCount > 0)
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(TimeSpan.FromSeconds(10));
-                var bytes = await speech.SynthesizeAsync(item.Body, timeout.Token);
-                await audio.PlayAsync(bytes, () => Report("playing"), ct);
-                Report("played"); played = true;
+                try
+                {
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                    var bytes = await speech.SynthesizeAsync(item.Body, item.VoiceType, timeout.Token);
+                    var started = false;
+                    for (var repeat = 0; repeat < item.RepeatCount; repeat++)
+                        await audio.PlayAsync(bytes, () => { if (!started) { Report("playing"); started = true; } }, ct);
+                    Report("played"); played = true;
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception) { Report("audio_failed", "语音合成或播放失败"); }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception) { Report("audio_failed", "语音合成或播放失败"); }
-            var remaining = played ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10) - System.Diagnostics.Stopwatch.GetElapsedTime(shownAt);
-            if (remaining > TimeSpan.Zero) await _delay(remaining, ct);
+            if (item.AutoClose)
+            {
+                var remaining = played ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10) - System.Diagnostics.Stopwatch.GetElapsedTime(shownAt);
+                if (remaining > TimeSpan.Zero) await _delay(remaining, ct);
+            }
+            else
+            {
+                await display.ShowCloseButtonAsync();
+                await display.WaitForCloseAsync(ct);
+            }
             Report("finished");
         }
         finally { await display.HideAsync(); }

@@ -5,10 +5,10 @@
 ## Supabase
 
 1. 创建 Supabase 项目，记录项目 URL、publishable/anon 公钥。客户端使用公钥，绝不能填写 service_role 密钥。当前项目 URL 为 `https://kmuuixuiipqxzeyoawap.supabase.co`。
-2. 使用 Supabase CLI 链接项目并应用 `supabase/migrations/202609080001_broadcast.sql`。迁移创建六个班级、设备表、广播及回执、权限函数和 Realtime publication。
+2. 使用 Supabase CLI 链接项目并按文件名顺序应用 `supabase/migrations` 下的所有 SQL。`202609120001_broadcast_options.sql` 新增老师姓名、播放次数、关闭方式、情感和音色字段，并更新发送与待播查询。
 3. 保持 Auth 用户自助注册关闭。创建一个邮箱密码用户，例如 `admin@broadcast.local`，确认邮箱，并通过受信任的 Admin API 将 `app_metadata.role` 设置为 `admin`。必须使用 **app_metadata**，不能使用用户可写的 user_metadata。前端和教室端的管理员邮箱必须与此一致。
 4. 部署 `broadcast-api` Edge Function。`supabase/config.toml` 中该函数设置 `verify_jwt=false`，函数内部会调用 `auth.getUser(token)` 验证每一个请求并检查管理员或设备权限，因此不能删除函数内鉴权。
-5. 配置函数 Secret：`ALLOWED_ORIGINS`。Supabase 自带的 URL、anon key 和 service_role key 由函数环境提供；Supabase 不再保存腾讯云凭据或生成音频。
+5. 配置函数 Secret：`ALLOWED_ORIGINS`、`TENCENT_SECRET_ID`、`TENCENT_SECRET_KEY`，可选 `TENCENT_TTS_REGION`（默认 `ap-guangzhou`）。Supabase 中的腾讯云凭据只用于老师端固定短句试听；正式广播仍由教室电脑直连腾讯云生成。
 6. `ALLOWED_ORIGINS` 为逗号分隔的老师端完整来源，包括协议及端口；本地使用 `http://127.0.0.1:5173,http://localhost:5173`。GitHub Pages 使用来源 `https://willyblah.github.io`；URL 路径 `/Broadcast/` 不属于 Origin。
 
 示例 CLI（在用户下发配置指令后使用）：
@@ -25,11 +25,11 @@ supabase functions deploy broadcast-api
 
 ## 腾讯云
 
-开通基础语音合成，确认账号可调用 `TextToVoice`、默认音色 `101001` 可用。按需配置其他音色编号；本版老师端不提供音色下拉菜单。
+开通基础语音合成，确认账号可调用 `TextToVoice`。老师端提供腾讯云智瑜 `101001`、智云 `101004`、智燕 `101011`、智辉 `101013`、智甜 `101016` 五种中文音色。
 
 合成使用 `tts.tencentcloudapi.com`、API 版本 `2019-08-23`、正常语速、16kHz WAV。超过单次中文长度限制时拆成最多 150 字的片段，并解析 RIFF 块拼接 PCM。客户端会在合成音频前加入一秒静音，让蓝牙、HDMI 或 USB 音频设备完成唤醒后再输出语音。整个合成流程限时 10 秒，失败自动转为文字广播。
 
-每台教室电脑从程序同目录的 `appsettings.json` 读取腾讯云凭据与语音参数，并在收到广播正文后直接请求腾讯云。音频只在教室客户端内存中生成和播放，不上传到 Supabase，也不经过老师端。
+每台教室电脑从程序同目录的 `appsettings.json` 读取腾讯云凭据与语音参数，并在收到广播正文后直接请求腾讯云。音色由每条广播决定，不在教室配置文件中固定。音频只在教室客户端内存中生成和播放，不上传到 Supabase。
 
 ## 老师端
 
@@ -60,7 +60,6 @@ VITE_ADMIN_EMAIL=admin@broadcast.local
     "secret_id": "YOUR_TENCENT_SECRET_ID",
     "secret_key": "YOUR_TENCENT_SECRET_KEY",
     "region": "ap-guangzhou",
-    "voice_type": 101001,
     "model_type": 1,
     "sample_rate": 16000,
     "speed": 0,

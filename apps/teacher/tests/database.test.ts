@@ -15,7 +15,8 @@ async function scalar<T>(sql: string, args: unknown[] = []) { return Object.valu
 async function create(targets = ['8-1']) {
   const id = crypto.randomUUID();
   await identity(admin, 'admin');
-  await db.query('select create_broadcast($1, $2, $3)', [id, '请同学们回到教室。', targets]);
+  await db.query('select create_broadcast($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, '请同学们回到教室。', targets, null, '王老师', 2, false, 'warning', 101013]);
   return id;
 }
 async function delivery(id: string, classroom = '8-1') { await identity(admin, 'admin'); return scalar<string>('select id from deliveries where broadcast_id=$1 and classroom_id=$2', [id, classroom]); }
@@ -32,6 +33,7 @@ beforeAll(async () => {
     insert into auth.users values ('${admin}'),('${first}'),('${second}'),('${third}');`);
   await db.exec(await readFile(new URL('../../../supabase/migrations/202609080001_broadcast.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../../../supabase/migrations/202609100001_heartbeat_intervals.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../../../supabase/migrations/202609120001_broadcast_options.sql', import.meta.url), 'utf8'));
   await identity(admin, 'admin');
   await db.query('select bind_device($1,$2,$3)', [first, '8-1', 'classroom-one']);
   await db.query('select bind_device($1,$2,$3)', [second, '8-2', 'classroom-two']);
@@ -40,7 +42,7 @@ afterAll(async () => { await db?.close(); });
 describe('database contract and RLS (real PostgreSQL engine)', () => {
   it('seeds exactly six classrooms', async () => { await identity(admin, 'admin'); expect(await scalar<number>('select count(*)::int from classrooms')).toBe(6); });
   it('rejects a second device competing for an occupied classroom', async () => { await identity(admin, 'admin'); await expect(db.query('select bind_device($1,$2,$3)', [third, '8-1', 'competitor'])).rejects.toThrow('已被其他设备绑定'); });
-  it('prevents device users from changing bindings or sending broadcasts', async () => { await identity(first); await expect(db.query('select unbind_device($1)', ['8-2'])).rejects.toThrow('管理员'); await expect(db.query('select create_broadcast($1,$2,$3)', [crypto.randomUUID(), 'forged', ['8-2']])).rejects.toThrow('管理员'); });
+  it('prevents device users from changing bindings or sending broadcasts', async () => { await identity(first); await expect(db.query('select unbind_device($1)', ['8-2'])).rejects.toThrow('管理员'); await expect(db.query('select create_broadcast($1,$2,$3,$4,$5,$6,$7,$8,$9)', [crypto.randomUUID(), 'forged', ['8-2'], null, '伪造者', 1, true, 'normal', 101001])).rejects.toThrow('管理员'); });
   it('only exposes the device own classroom and deliveries', async () => {
     const id = await create(['8-1','8-2']); await identity(first);
     expect(await scalar<number>('select count(*)::int from classrooms')).toBe(1);
@@ -49,9 +51,16 @@ describe('database contract and RLS (real PostgreSQL engine)', () => {
     expect(await scalar<number>('select count(*)::int from broadcasts')).toBe(0);
   });
   it('uses a server timestamp and a 30 second TTL, and retries are idempotent', async () => {
-    const id = await create(); await db.query('select create_broadcast($1,$2,$3)', [id, '请同学们回到教室。', ['8-1']]);
+    const id = await create(); await db.query('select create_broadcast($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [id, '请同学们回到教室。', ['8-1'], null, '王老师', 2, false, 'warning', 101013]);
     expect(await scalar<number>('select count(*)::int from deliveries where broadcast_id=$1', [id])).toBe(1);
     expect(await scalar<number>('select extract(epoch from expires_at-created_at)::int from broadcasts where id=$1', [id])).toBe(30);
+  });
+  it('delivers the teacher name and presentation options to the classroom', async () => {
+    await create(); await identity(first);
+    const pending = await scalar<{ items: Array<Record<string, unknown>> }>('select pending_broadcasts()');
+    expect(pending.items[0]).toMatchObject({ teacher_name: '王老师', repeat_count: 2, auto_close: false,
+      emotion: 'warning', voice_type: 101013 });
   });
   it('requires a client receipt and atomically claims only once', async () => {
     const id = await create(); const did = await delivery(id); await identity(first);

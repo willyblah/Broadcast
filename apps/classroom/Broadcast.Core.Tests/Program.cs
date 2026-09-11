@@ -4,6 +4,9 @@ using System.Collections.Concurrent;
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("Audio receipt order and three-second linger", Happy),
+    ("One synthesis can be played repeatedly", Repeats),
+    ("Zero repeats is an intentional text-only broadcast", ZeroRepeats),
+    ("Manual close keeps the completed broadcast visible", ManualClose),
     ("TTS failure displays only text for ten seconds", TextOnly),
     ("Audio player failure does not report played", AudioFailure),
     ("FIFO skips a queued broadcast that expires", ExpiredQueue),
@@ -79,11 +82,33 @@ static async Task Happy()
     Check(h.Backend.Receipts.Select(r => r.Event).SequenceEqual(new[] { "received", "displayed", "playing", "played", "finished" }));
     Check(h.Delays.Single() == TimeSpan.FromSeconds(3));
 }
+static async Task Repeats()
+{
+    await using var h = new Harness(); h.Backend.Items = [h.Item("repeat") with { RepeatCount = 3, VoiceType = 101013 }];
+    await h.Start(); await Until(() => h.Display.Hidden == 1); await h.Outbox.FlushAsync(h.Backend, default);
+    Check(h.Speech.Calls == 1 && h.Speech.VoiceTypes.Single() == 101013); Check(h.Audio.Played == 3);
+    Check(h.Backend.Receipts.Count(r => r.Event == "playing") == 1 && h.Backend.Receipts.Count(r => r.Event == "played") == 1);
+}
+static async Task ZeroRepeats()
+{
+    await using var h = new Harness(); h.Backend.Items = [h.Item("text only") with { RepeatCount = 0 }];
+    await h.Start(); await Until(() => h.Display.Hidden == 1); await h.Outbox.FlushAsync(h.Backend, default);
+    Check(h.Speech.Calls == 0 && h.Audio.Played == 0); Check(h.Delays.Single().TotalSeconds is > 9 and <= 10);
+    Check(!h.Backend.Receipts.Any(r => r.Event is "playing" or "played" or "audio_failed"));
+}
+static async Task ManualClose()
+{
+    await using var h = new Harness(); h.Backend.Items = [h.Item("keep") with { AutoClose = false }];
+    await h.Start(); await Until(() => h.Display.CloseShown == 1); await Task.Delay(20);
+    Check(h.Display.Hidden == 0); h.Display.CloseGate.SetResult();
+    await Until(() => h.Display.Hidden == 1); await h.Outbox.FlushAsync(h.Backend, default);
+    Check(h.Delays.IsEmpty && h.Backend.Receipts.Any(r => r.Event == "finished"));
+}
 static async Task TextOnly()
 {
     await using var h = new Harness(); h.Backend.Items = [h.Item("text")]; h.Speech.Fail = true;
     await h.Start(); await Until(() => h.Display.Hidden == 1); await h.Outbox.FlushAsync(h.Backend, default);
-    Check(h.Display.Shown.Single() == "text"); Check(h.Audio.Played == 0);
+    Check(h.Display.Shown.Single().Body == "text"); Check(h.Audio.Played == 0);
     Check(h.Delays.Single().TotalSeconds is > 9 and <= 10);
     Check(h.Backend.Receipts.Any(r => r.Event == "audio_failed") && !h.Backend.Receipts.Any(r => r.Event == "played"));
 }
@@ -99,7 +124,7 @@ static async Task ExpiredQueue()
     h.Backend.Items = [two, one]; h.Audio.Gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     await h.Start(); await Until(() => h.Audio.Played == 1); h.Clock.Sync(DateTimeOffset.UtcNow.AddMinutes(1)); h.Audio.Gate.SetResult();
     await Until(() => h.Display.Hidden == 1); await Task.Delay(30);
-    Check(h.Display.Shown.SequenceEqual(new[] { "first" })); Check(h.Backend.Claims.Count == 1);
+    Check(h.Display.Shown.Select(item => item.Body).SequenceEqual(new[] { "first" })); Check(h.Backend.Claims.Count == 1);
 }
 static async Task Expired()
 {
@@ -168,8 +193,11 @@ sealed class FakeBackend : IBackend
 }
 sealed class FakeDisplay : IDisplay
 {
-    public readonly ConcurrentQueue<string> Shown = []; public int Hidden; public bool Fail;
-    public Task ShowAsync(string body, CancellationToken ct) { if (Fail) throw new IOException("display unavailable"); Shown.Enqueue(body); return Task.CompletedTask; }
+    public readonly ConcurrentQueue<Delivery> Shown = []; public readonly TaskCompletionSource CloseGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public int Hidden; public int CloseShown; public bool Fail;
+    public Task ShowAsync(Delivery delivery, CancellationToken ct) { if (Fail) throw new IOException("display unavailable"); Shown.Enqueue(delivery); return Task.CompletedTask; }
+    public Task ShowCloseButtonAsync() { Interlocked.Increment(ref CloseShown); return Task.CompletedTask; }
+    public Task WaitForCloseAsync(CancellationToken ct) => CloseGate.Task.WaitAsync(ct);
     public Task HideAsync() { Interlocked.Increment(ref Hidden); return Task.CompletedTask; }
 }
 sealed class FakeAudio : IAudioPlayer
@@ -180,8 +208,9 @@ sealed class FakeAudio : IAudioPlayer
 }
 sealed class FakeSpeech : ISpeechSynthesizer
 {
-    public bool Fail;
-    public Task<byte[]> SynthesizeAsync(string text, CancellationToken ct) => Fail
+    public bool Fail; public int Calls; public readonly ConcurrentQueue<int> VoiceTypes = [];
+    public Task<byte[]> SynthesizeAsync(string text, int voiceType, CancellationToken ct)
+    { Interlocked.Increment(ref Calls); VoiceTypes.Enqueue(voiceType); return Fail
         ? Task.FromException<byte[]>(new InvalidOperationException("tts failed"))
-        : Task.FromResult(new byte[] { 1 });
+        : Task.FromResult(new byte[] { 1 }); }
 }

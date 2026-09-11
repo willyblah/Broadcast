@@ -8,17 +8,19 @@ namespace Broadcast.Core;
 public sealed class TencentSpeechSynthesizer(TencentTtsConfig config) : ISpeechSynthesizer, IDisposable
 {
     private const string Host = "tts.tencentcloudapi.com";
+    private static readonly HashSet<int> SupportedVoiceTypes = [101001, 101004, 101011, 101013, 101016];
     private readonly HttpClient _http = new() { Timeout = Timeout.InfiniteTimeSpan };
 
-    public async Task<byte[]> SynthesizeAsync(string text, CancellationToken ct)
+    public async Task<byte[]> SynthesizeAsync(string text, int voiceType, CancellationToken ct)
     {
         if (!config.IsConfigured) throw new InvalidOperationException("腾讯云语音尚未配置");
+        if (!SupportedVoiceTypes.Contains(voiceType)) throw new InvalidOperationException("音色无效");
         var files = new List<byte[]>();
-        foreach (var part in SplitText(text)) files.Add(await SynthesizePartAsync(part, ct));
+        foreach (var part in SplitText(text)) files.Add(await SynthesizePartAsync(part, voiceType, ct));
         return JoinWav(files);
     }
 
-    private async Task<byte[]> SynthesizePartAsync(string text, CancellationToken ct)
+    private async Task<byte[]> SynthesizePartAsync(string text, int voiceType, CancellationToken ct)
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var date = DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime.ToString("yyyy-MM-dd");
@@ -27,7 +29,7 @@ public sealed class TencentSpeechSynthesizer(TencentTtsConfig config) : ISpeechS
             Text = text,
             SessionId = Guid.NewGuid().ToString(),
             config.ModelType,
-            config.VoiceType,
+            VoiceType = voiceType,
             config.Speed,
             config.Volume,
             config.SampleRate,

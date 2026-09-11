@@ -10,7 +10,7 @@ public static class Json
 }
 
 public sealed record TencentTtsConfig(string SecretId = "", string SecretKey = "", string Region = "ap-guangzhou",
-    int VoiceType = 101001, int ModelType = 1, int SampleRate = 16000, int Speed = 0, int Volume = 0)
+    int ModelType = 1, int SampleRate = 16000, int Speed = 0, int Volume = 0)
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(SecretId) && !string.IsNullOrWhiteSpace(SecretKey)
         && !string.IsNullOrWhiteSpace(Region);
@@ -31,7 +31,8 @@ public sealed record ClassroomStatus(DateTimeOffset ServerNow, Classroom[] Class
 public sealed record Heartbeat(bool Active, string? ClassroomId, DateTimeOffset ServerNow);
 public sealed record PendingBatch(DateTimeOffset ServerNow, Delivery[] Items);
 public sealed record Delivery(Guid DeliveryId, Guid BroadcastId, string Body, DateTimeOffset CreatedAt,
-    DateTimeOffset ExpiresAt);
+    DateTimeOffset ExpiresAt, string TeacherName = "未知老师", int RepeatCount = 1, bool AutoClose = true,
+    string Emotion = "normal", int VoiceType = 101001);
 public sealed record Receipt(Guid DeliveryId, string Event, DateTimeOffset At, string? Error = null);
 
 public sealed class ServerClock
@@ -51,7 +52,9 @@ public interface IBackend
 }
 public interface IDisplay
 {
-    Task ShowAsync(string body, CancellationToken ct);
+    Task ShowAsync(Delivery delivery, CancellationToken ct);
+    Task ShowCloseButtonAsync();
+    Task WaitForCloseAsync(CancellationToken ct);
     Task HideAsync();
 }
 public interface IAudioPlayer
@@ -60,5 +63,5 @@ public interface IAudioPlayer
 }
 public interface ISpeechSynthesizer
 {
-    Task<byte[]> SynthesizeAsync(string text, CancellationToken ct);
+    Task<byte[]> SynthesizeAsync(string text, int voiceType, CancellationToken ct);
 }
