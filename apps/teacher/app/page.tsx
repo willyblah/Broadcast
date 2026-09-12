@@ -228,9 +228,9 @@ export default function App() {
               {EMOTIONS.map(item => <button type="button" key={item.id} className={emotion === item.id ? `active emotion-${item.id}` : ''} aria-pressed={emotion === item.id} onClick={() => setEmotion(item.id)}><span>{item.emoji || '无 emoji'}</span>{item.label}</button>)}
             </div></fieldset>
             <fieldset className="option-field voice-field"><legend>音色</legend><div className="voice-list">
-              {VOICES.map(voice => <div className={'voice-row ' + (voiceType === voice.id ? 'selected' : '')} key={voice.id} onClick={() => setVoiceType(voice.id)}>
+              {VOICES.map(voice => <div className={'voice-row ' + (voiceType === voice.id ? 'selected' : '')} key={voice.id}>
                 <label aria-label={`${voice.name} ${voice.detail}`}><input type="radio" name="voice" checked={voiceType === voice.id} onChange={() => setVoiceType(voice.id)} /><span><strong>{voice.name}</strong><small>{voice.detail}</small></span></label>
-                <Button type="button" variant="outline" className="preview-button" onClick={event => { event.stopPropagation(); void previewVoice(voice.id); }}><Volume2 size={16} />试听</Button>
+                <Button type="button" variant="outline" className="preview-button" onClick={() => void previewVoice(voice.id)}><Volume2 size={16} />试听</Button>
               </div>)}
             </div></fieldset>
           </div>
