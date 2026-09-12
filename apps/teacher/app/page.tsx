@@ -15,7 +15,7 @@ const emptyRooms: Classroom[] = CLASSROOM_IDS.map(id => ({ id, device_id: null, 
 const time = (value: string) => new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
 const message = (error: unknown) => error instanceof Error ? error.message : '操作未完成，请重试';
 const teacherKey = 'broadcast-teacher-session-v2';
-const previewKey = (voice: number) => `broadcast-voice-preview-v1-${voice}`;
+const previewUrl = (voice: number) => `${import.meta.env.BASE_URL}voice-previews/${voice}.wav`;
 const rememberedTeacher = () => localStorage.getItem(teacherKey)?.trim() || '';
 
 export default function App() {
@@ -164,12 +164,7 @@ export default function App() {
     setPreviewing(id); setError('');
     try {
       previewAudio.current?.pause();
-      let audio = localStorage.getItem(previewKey(id));
-      if (!audio) {
-        audio = (await api<{ audio: string }>({ action: 'voice-preview', voice_type: id })).audio;
-        try { localStorage.setItem(previewKey(id), audio); } catch { /* Browser storage can be unavailable or full. */ }
-      }
-      const player = new Audio(`data:audio/wav;base64,${audio}`); previewAudio.current = player;
+      const player = new Audio(previewUrl(id)); previewAudio.current = player;
       await player.play();
     } catch (e) { setError(message(e)); }
     finally { setPreviewing(null); }
@@ -237,7 +232,7 @@ export default function App() {
             <fieldset className="option-field voice-field"><legend>音色</legend><p className="voice-note">试听固定文本“请Badger去吃饭”，不会合成上方正文。</p><div className="voice-list">
               {VOICES.map(voice => <div className={'voice-row ' + (voiceType === voice.id ? 'selected' : '')} key={voice.id}>
                 <label aria-label={`${voice.name} ${voice.detail}`}><input type="radio" name="voice" checked={voiceType === voice.id} onChange={() => setVoiceType(voice.id)} /><span><strong>{voice.name}</strong><small>{voice.detail}</small></span></label>
-                <Button type="button" variant="outline" className="preview-button" disabled={previewing !== null || !ready} onClick={() => void previewVoice(voice.id)}><Volume2 size={16} />{previewing === voice.id ? '加载中…' : '试听'}</Button>
+                <Button type="button" variant="outline" className="preview-button" disabled={previewing !== null} onClick={() => void previewVoice(voice.id)}><Volume2 size={16} />{previewing === voice.id ? '加载中…' : '试听'}</Button>
               </div>)}
             </div></fieldset>
           </div>

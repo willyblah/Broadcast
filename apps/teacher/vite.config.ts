@@ -18,7 +18,7 @@ export default defineConfig({
       theme_color: '#2563eb', background_color: '#f5f7fa',
       icons: [192, 512].map(size => ({ src: base + 'icon-' + size + '.png', sizes: size + 'x' + size, type: 'image/png', purpose: 'any' })),
     },
-    workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'], navigateFallback: base + 'index.html', cleanupOutdatedCaches: true },
+    workbox: { globPatterns: ['**/*.{js,css,html,svg,png,wav,woff2}'], navigateFallback: base + 'index.html', cleanupOutdatedCaches: true },
   })],
   resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
   css: { postcss: { plugins: [tailwindcss()] } },

@@ -9,7 +9,6 @@
 | action | 其他请求参数 | 结果 |
 | --- | --- | --- |
 | `send` | `request_id`, `body`, `classrooms: string[]`, `teacher_name`, `repeat_count` (0–5), `auto_close`, `emotion`, `voice_type`, 可空 `source_id` | `id` |
-| `voice-preview` | `voice_type` | 固定文本“请Badger去吃饭”的 base64 WAV `audio` |
 | `register-device` | `classroom_id`, `name` | Supabase `session`, `classroom_id` |
 
 两个操作均仅管理员可用。创建请求以 `request_id` 去重；同一逻辑重试必须保留该 ID，明确重新发送使用新 ID。Edge Function 只发送正文和投递信息，不生成、保存或返回音频。
@@ -31,7 +30,7 @@
 
 `pending_broadcasts.items` 每项包含 `delivery_id`, `broadcast_id`, `body`, `teacher_name`, `repeat_count`, `auto_close`, `emotion`, `voice_type`, `created_at`, `expires_at`。查询不传入设备 ID，由服务端从 JWT 确定身份。教室客户端根据 `body` 和 `voice_type` 直接调用腾讯云 TTS，并在本机播放生成的 WAV。当 `repeat_count` 大于 1 时重用同一份 WAV。
 
-`emotion` 可取 `normal` / `happy` / `sad` / `angry` / `warning`；`voice_type` 可取 `101001` / `101004` / `101011` / `101013` / `101016`。`voice-preview` 仅管理员可用，服务端不接收自定义试听文本；老师端会在浏览器本地缓存各音色样音。
+`emotion` 可取 `normal` / `happy` / `sad` / `angry` / `warning`；`voice_type` 可取 `101001` / `101004` / `101011` / `101013` / `101016`。老师端随网页发布这 5 种音色的固定 WAV 样音，文本均为“请Badger去吃饭”，试听时不请求腾讯云或 Supabase。
 
 回执事件：`received`、`displayed`、`playing`、`played`、`audio_failed`、`finished`、`failed`。字段分别保存第一次收到的事件时间；回执不能将已经存在的时间覆盖，也不能直接更新数据库表。`played` 要求该投递已经开始且存在 `playing` 回执。时间来自客户端校准后的服务端时钟，服务端拒绝明显的未来时间。
 

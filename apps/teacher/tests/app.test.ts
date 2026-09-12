@@ -37,3 +37,13 @@ it('opens history without presenting fabricated records', async () => {
   expect(host.querySelectorAll('.history-card')).toHaveLength(0);
   await click('发广播'); expect(host.querySelector('textarea')).not.toBeNull();
 });
+it('plays the selected voice from the published static samples', async () => {
+  const play = vi.fn().mockResolvedValue(undefined);
+  const Audio = vi.fn(function (this: { play: typeof play; pause: () => void }, source: string) {
+    expect(source).toBe('/voice-previews/101001.wav');
+    this.play = play; this.pause = vi.fn();
+  });
+  vi.stubGlobal('Audio', Audio);
+  await click('试听');
+  expect(Audio).toHaveBeenCalledOnce(); expect(play).toHaveBeenCalledOnce();
+});
