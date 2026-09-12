@@ -221,7 +221,7 @@ export default function App() {
           <div className="broadcast-options">
             <fieldset className="option-field"><legend>播报几遍</legend><div className="choice-row compact">
               {[0, 1, 2, 3, 4, 5].map(count => <button type="button" key={count} className={repeatCount === count ? 'active' : ''} aria-pressed={repeatCount === count} onClick={() => setRepeatCount(count)}>{count}</button>)}
-            </div><p>{repeatCount === 0 ? '只显示文字，不播放语音' : `音频只合成一次，本机播放 ${repeatCount} 遍`}</p></fieldset>
+            </div></fieldset>
             <fieldset className="option-field"><legend>完成后</legend><div className="choice-row">
               <button type="button" className={autoClose ? 'active' : ''} aria-pressed={autoClose} onClick={() => setAutoClose(true)}>自动关闭</button>
               <button type="button" className={!autoClose ? 'active' : ''} aria-pressed={!autoClose} onClick={() => setAutoClose(false)}>保留，手动关闭</button>
