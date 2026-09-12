@@ -31,7 +31,6 @@ export default function App() {
   const [autoClose, setAutoClose] = useState(true);
   const [emotion, setEmotion] = useState<Emotion>('normal');
   const [voiceType, setVoiceType] = useState(101001);
-  const [previewing, setPreviewing] = useState<number | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [history, setHistory] = useState<Broadcast[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -161,13 +160,12 @@ export default function App() {
     setTab('send'); setLatestId(null); setNotice('已填入历史内容，可调整班级后发送'); window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   async function previewVoice(id: number) {
-    setPreviewing(id); setError('');
+    setError('');
     try {
       previewAudio.current?.pause();
       const player = new Audio(previewUrl(id)); previewAudio.current = player;
       await player.play();
     } catch (e) { setError(message(e)); }
-    finally { setPreviewing(null); }
   }
   const known = configured && !!session && live && network;
   const ready = configured && !!session && network && validTeacherName(teacherName);
@@ -230,9 +228,9 @@ export default function App() {
               {EMOTIONS.map(item => <button type="button" key={item.id} className={emotion === item.id ? `active emotion-${item.id}` : ''} aria-pressed={emotion === item.id} onClick={() => setEmotion(item.id)}><span>{item.emoji || '无 emoji'}</span>{item.label}</button>)}
             </div></fieldset>
             <fieldset className="option-field voice-field"><legend>音色</legend><div className="voice-list">
-              {VOICES.map(voice => <div className={'voice-row ' + (voiceType === voice.id ? 'selected' : '')} key={voice.id}>
+              {VOICES.map(voice => <div className={'voice-row ' + (voiceType === voice.id ? 'selected' : '')} key={voice.id} onClick={() => setVoiceType(voice.id)}>
                 <label aria-label={`${voice.name} ${voice.detail}`}><input type="radio" name="voice" checked={voiceType === voice.id} onChange={() => setVoiceType(voice.id)} /><span><strong>{voice.name}</strong><small>{voice.detail}</small></span></label>
-                <Button type="button" variant="outline" className="preview-button" disabled={previewing !== null} onClick={() => void previewVoice(voice.id)}><Volume2 size={16} />{previewing === voice.id ? '加载中…' : '试听'}</Button>
+                <Button type="button" variant="outline" className="preview-button" onClick={event => { event.stopPropagation(); void previewVoice(voice.id); }}><Volume2 size={16} />试听</Button>
               </div>)}
             </div></fieldset>
           </div>
