@@ -5,6 +5,7 @@
 @source '../components/ui/input.tsx';
 @source '../components/ui/textarea.tsx';
 @source '../components/ui/alert-dialog.tsx';
+@source '../components/ui/dialog.tsx';
 @theme inline {
   --color-primary: #2563eb; --color-primary-foreground: #fff;
   --color-background: #fff; --color-foreground: #182236;
@@ -46,6 +47,14 @@ h1,h2,p { margin: 0; } h1 { font-size: 23px; letter-spacing: -.6px; font-weight:
 .character-count { font-size: 14px; color: #627088; }
 .broadcast-input { width: 100%; min-height: 155px; resize: vertical; border: 1px solid #dce2eb; padding: 15px; border-radius: 10px; font-size: 17px; line-height: 1.75; background: #fafbfd; }
 .broadcast-input::placeholder { color: #6b778b; }
+.template-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.template-chip { padding: 9px 13px; border: 1px solid #cfd7e4; border-radius: 999px; background: #fff; color: #344158; font-size: 15px; line-height: 1.2; }
+.template-chip:hover { border-color: #8aa8dc; background: #f2f7ff; color: #1f55bd; }
+.template-card { background: #fff; border-radius: 16px; padding: 26px; width: min(calc(100% - 32px), 470px); max-width: none; }
+.template-form { margin-top: 8px; }
+.template-fill { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 6px; font-size: 17px; }
+.blank-input { width: 8em; height: 40px; font-size: 16px; padding: 0 10px; border-radius: 9px; background: #fafbfd; }
+.template-card .confirm-actions { margin-top: 22px; }
 .broadcast-options { margin-top: 22px; }
 .option-field { border: 0; padding: 20px 0 0; margin: 0; }
 .option-field + .option-field { margin-top: 20px; }
@@ -112,7 +121,7 @@ h1,h2,p { margin: 0; } h1 { font-size: 23px; letter-spacing: -.6px; font-weight:
   .class-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } .class-card { padding: 16px 17px; border-radius: 12px; } .class-top { margin-bottom: 11px; } .class-number { font-size: 26px; }
   .section-heading { margin-bottom: 15px; } h1 { font-size: 21px; } .section { margin-bottom: 22px; }
   .composer, .delivery-panel, .devices-panel { padding: 18px; border-radius: 14px; } .broadcast-input { min-height: 140px; padding: 12px; font-size: 16px; }
-  .voice-list { grid-template-columns: 1fr; } .emotion-row button { flex: 1 1 calc(33% - 9px); justify-content: center; padding: 0 10px; }
+  .voice-list { grid-template-columns: 1fr; } .template-fill { font-size: 16px; } .blank-input { width: 7em; } .emotion-row button { flex: 1 1 calc(33% - 9px); justify-content: center; padding: 0 10px; }
   .composer-bottom { flex-direction: column; align-items: stretch; gap: 13px; margin-top: 13px; } .send-actions { width: 100%; } .send-actions .primary { flex: 1; }
   .action { height: 46px; } .selected-count { font-size: 14px; }
   .receipt-offline { width: 100%; text-align: right; } .history-summary { padding: 18px; } .history-detail { padding: 0 18px 18px; }

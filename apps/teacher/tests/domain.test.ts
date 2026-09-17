@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryStatus, isOnline, validDraft, validTeacherName, type Broadcast, type Classroom, type Delivery } from '../lib/domain';
+import { TEMPLATES, deliveryStatus, fillTemplate, isOnline, templateBlanks, validDraft, validTeacherName, type Broadcast, type Classroom, type Delivery } from '../lib/domain';
 const now = Date.parse('2026-09-08T10:00:00Z');
 const room: Classroom = { id: '8-1', device_id: 'one', device_name: 'PC', connected: true, last_seen_at: new Date(now - 139_999).toISOString() };
 const d: Delivery = { id: 'one', classroom_id: '8-1', device_id: 'device', online_at_send: true, received_at: null, started_at: null, displayed_at: null, playback_started_at: null, played_at: null, finished_at: null, audio_error: null };
@@ -17,4 +17,13 @@ describe('truthful device status', () => {
   it('labels a deliberate zero-repeat broadcast as text-only', () => { expect(deliveryStatus({ ...d, displayed_at: 'time', finished_at: 'time' }, { ...b, repeat_count: 0 }, now).label).toBe('已完成 · 仅文字'); });
   it('requires nonempty text and targets with a 300 code point limit', () => { expect(validDraft('  ', ['8-1'])).toBe(false); expect(validDraft('你好', [])).toBe(false); expect(validDraft('🎒'.repeat(300), ['8-1'])).toBe(true); expect(validDraft('字'.repeat(301), ['8-1'])).toBe(false); });
   it('requires a teacher name on the new login', () => { expect(validTeacherName('王老师')).toBe(true); expect(validTeacherName(' ')).toBe(false); expect(validTeacherName('字'.repeat(41))).toBe(false); });
+});
+describe('broadcast templates', () => {
+  it('counts the blanks each template asks the teacher to fill', () => {
+    expect(TEMPLATES.map(item => templateBlanks(item.text))).toEqual([2, 1, 2, 1, 0, 0]);
+  });
+  it('fills every blank in order and trims the entered words', () => {
+    expect(fillTemplate('请_到_办公室', [' 张小明 ', '二楼'])).toBe('请张小明到二楼办公室');
+    expect(fillTemplate('戴好红领巾', [])).toBe('戴好红领巾');
+  });
 });

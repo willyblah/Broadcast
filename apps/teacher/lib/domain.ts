@@ -14,6 +14,14 @@ export const VOICES = [
   { id: 101013, name: '智辉', detail: '新闻男声' },
   { id: 101016, name: '智甜', detail: '女童声' },
 ] as const;
+export const TEMPLATES: { label: string; text: string }[] = [
+  { label: '请人到办公室', text: '请_到_办公室' },
+  { label: '请到某处集合', text: '请到_集合' },
+  { label: '请把东西交到某处', text: '请把_交到_' },
+  { label: '下节课去某处', text: '下节课去_' },
+  { label: '戴好红领巾', text: '戴好红领巾' },
+  { label: '回到座位，保持安静', text: '回到座位，保持安静' },
+];
 export interface Classroom {
   id: string; device_id: string | null; device_name: string | null;
   last_seen_at: string | null; connected: boolean;
@@ -53,4 +61,11 @@ export function validDraft(body: string, selected: string[]): boolean {
 export function validTeacherName(name: string): boolean {
   const length = Array.from(name.trim()).length;
   return length > 0 && length <= 40;
+}
+export function templateBlanks(template: string): number {
+  return template.split('_').length - 1;
+}
+export function fillTemplate(template: string, blanks: string[]): string {
+  let index = 0;
+  return template.replace(/_/g, () => blanks[index++]?.trim() ?? '');
 }

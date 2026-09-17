@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { ArrowLeft, ArrowUpRight, AudioLines, Check, ChevronRight, Clock3, LogOut, Radio, Send, Settings2, Square, Volume2, WifiOff, X } from 'lucide-react';
@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogCancel } from '@/components/ui/alert-dialog';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { registerBroadcastTools } from '@/lib/webmcp';
 import { adminEmail, api, configured, getClassrooms, getHistory, rpc, supabase } from '@/lib/api';
-import { CLASSROOM_IDS, EMOTIONS, VOICES, deliveryStatus, isOnline, validDraft, validTeacherName,
+import { CLASSROOM_IDS, EMOTIONS, TEMPLATES, VOICES, deliveryStatus, fillTemplate, isOnline, templateBlanks, validDraft, validTeacherName,
   type Broadcast, type Classroom, type Emotion } from '@/lib/domain';
 
 const emptyRooms: Classroom[] = CLASSROOM_IDS.map(id => ({ id, device_id: null, device_name: null, connected: false, last_seen_at: null }));
@@ -45,8 +46,12 @@ export default function App() {
   const [now, setNow] = useState(Date.now);
   const clock = useRef({ server: 0, local: 0 });
   const [confirmRoom, setConfirmRoom] = useState<Classroom | null>(null);
+  const [template, setTemplate] = useState('');
+  const [blanks, setBlanks] = useState<string[]>([]);
+  const [filling, setFilling] = useState(false);
   const sw = useRegisterSW();
   const previewAudio = useRef<HTMLAudioElement | null>(null);
+  const firstBlank = useRef<HTMLInputElement>(null);
   const userId = session?.user.id;
   const length = Array.from(body.trim()).length;
 
@@ -159,6 +164,11 @@ export default function App() {
     setRepeatCount(item.repeat_count); setAutoClose(item.auto_close); setEmotion(item.emotion); setVoiceType(item.voice_type);
     setTab('send'); setLatestId(null); setNotice('已填入历史内容，可调整班级后发送'); window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  function pickTemplate(item: string) {
+    const count = templateBlanks(item);
+    if (!count) { setBody(item); return; }
+    setBlanks(Array.from({ length: count }, () => '')); setTemplate(item); setFilling(true);
+  }
   async function previewVoice(id: number) {
     setError('');
     try {
@@ -216,6 +226,7 @@ export default function App() {
         </section>
         <section className="section composer"><div className="section-heading"><h2>广播内容</h2><span className={'character-count ' + (length > 300 ? 'error-text' : '')}>{length} / 300</span></div>
           <Textarea className="broadcast-input" aria-label="广播内容" placeholder="输入需要广播的内容…" value={body} onChange={e => setBody(e.target.value)} />
+          <div className="template-row">{TEMPLATES.map(item => <button type="button" key={item.text} className="template-chip" onClick={() => pickTemplate(item.text)}>{item.label}</button>)}</div>
           <div className="broadcast-options">
             <fieldset className="option-field"><legend>播报几遍</legend><div className="choice-row compact">
               {[0, 1, 2, 3, 4, 5].map(count => <button type="button" key={count} className={repeatCount === count ? 'active' : ''} aria-pressed={repeatCount === count} onClick={() => setRepeatCount(count)}>{count}</button>)}
@@ -248,6 +259,18 @@ export default function App() {
         {hasMore && <Button variant="outline" className="action load-more" disabled={!!busy || !ready} onClick={() => void run('history', async () => { const items = await getHistory(history.at(-1)!.created_at); mergeHistory(items); setHasMore(items.length === 20); })}>加载更多</Button>}
       </section>}
       {tab === 'devices' && <section className="section devices-panel"><Button variant="ghost" className="back-button" onClick={() => setTab('send')}><ArrowLeft size={18} />返回广播</Button><h1>教室设备</h1><p className="muted device-intro">更换电脑前，可在这里解除原设备绑定。</p>{rooms.map(room => <div className="device-row" key={room.id}><div><strong>{room.id}</strong><p className="muted">{room.device_name || '未绑定设备'}</p></div><Button variant="outline" className="action" disabled={!room.device_id || !ready} onClick={() => setConfirmRoom(room)}>解绑</Button></div>)}</section>}
+      <Dialog open={filling} onOpenChange={setFilling}>
+        <DialogContent className="template-card" showCloseButton={false} initialFocus={firstBlank}><DialogTitle>补全模版</DialogTitle>
+          <form className="template-form" onSubmit={e => { e.preventDefault(); setBody(fillTemplate(template, blanks)); setFilling(false); }}>
+            <p className="template-fill">{template.split('_').map((part, index, parts) => <Fragment key={index}>{part}
+              {index < parts.length - 1 && <Input className="blank-input" ref={index === 0 ? firstBlank : undefined} maxLength={40} aria-label={`第 ${index + 1} 处填空`} value={blanks[index] ?? ''}
+                onChange={e => setBlanks(old => old.map((value, at) => at === index ? e.target.value : value))} />}
+            </Fragment>)}</p>
+            <div className="confirm-actions"><DialogClose className="action" render={<Button variant="outline" />}>取消</DialogClose>
+              <Button className="action primary" type="submit" disabled={blanks.some(value => !value.trim())}>填入广播</Button></div>
+          </form>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={!!confirmRoom} onOpenChange={open => { if (!open && !busy) setConfirmRoom(null); }}>
         <AlertDialogContent className="confirm-card"><AlertDialogTitle>解除 {confirmRoom?.id} 的绑定？</AlertDialogTitle><AlertDialogDescription>这台电脑将停止接收广播，班级可以绑定新设备。</AlertDialogDescription>
           <div className="confirm-actions"><AlertDialogCancel className="action" disabled={!!busy}>取消</AlertDialogCancel><Button className="action primary" disabled={!!busy} onClick={() => void run('unbind', async () => { if (!confirmRoom) return; await rpc('unbind_device', { p_classroom: confirmRoom.id }); setConfirmRoom(null); await refreshRooms(); setNotice('已解除设备绑定'); })}>确认解绑</Button></div>

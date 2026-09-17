@@ -13,10 +13,16 @@ beforeEach(async () => {
   await act(async () => root.render(createElement(App)));
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
-async function click(text: string) {
-  const button = Array.from(host.querySelectorAll('button')).find(b => b.textContent?.trim() === text);
+async function click(text: string, root: ParentNode = host) {
+  const button = Array.from(root.querySelectorAll('button')).find(b => b.textContent?.trim() === text);
   if (!button) throw new Error('Missing button: ' + text);
   await act(async () => button.click());
+}
+async function type(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    Reflect.set(HTMLInputElement.prototype, 'value', value, input);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 it('mounts the complete app and modal provider without configured cloud credentials', () => {
   expect(host.textContent).toContain('广播服务尚未配置');
@@ -46,4 +52,21 @@ it('plays the selected voice from the published static samples', async () => {
   vi.stubGlobal('Audio', Audio);
   await click('试听');
   expect(Audio).toHaveBeenCalledOnce(); expect(play).toHaveBeenCalledOnce();
+});
+it('writes a template without blanks straight into the broadcast box', async () => {
+  await click('戴好红领巾');
+  expect(host.querySelector('textarea')?.value).toBe('戴好红领巾');
+});
+it('collects every blank before replacing the broadcast text', async () => {
+  await click('请人到办公室');
+  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.blank-input'));
+  expect(inputs).toHaveLength(2);
+  const submit = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === '填入广播') as HTMLButtonElement;
+  expect(submit.disabled).toBe(true);
+  await type(inputs[0], '张小明');
+  await type(inputs[1], '二楼');
+  expect(submit.disabled).toBe(false);
+  await act(async () => submit.click());
+  expect(host.querySelector('textarea')?.value).toBe('请张小明到二楼办公室');
+  expect(document.querySelector('.blank-input')).toBeNull();
 });
