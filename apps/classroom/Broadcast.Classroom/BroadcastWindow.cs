@@ -1,8 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Broadcast.Core;
 
@@ -49,9 +51,26 @@ internal sealed class BroadcastWindow : Window
         _close = new Button
         {
             Content = "关闭", IsVisible = false, Width = 150, Height = 54, FontSize = 20,
+            Background = Brushes.White, Foreground = new SolidColorBrush(Color.Parse("#111827")),
+            BorderBrush = Brushes.White,
             HorizontalAlignment = HorizontalAlignment.Center, HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(0),
             Cursor = new Cursor(StandardCursorType.Hand), Margin = new Thickness(0, 20, 0, 0),
         };
+        _close.Classes.Add("broadcast-close");
+        var closeForeground = new SolidColorBrush(Color.Parse("#111827"));
+        foreach (var state in new[] { ":pointerover", ":pressed", ":disabled" })
+        {
+            Styles.Add(new Style(x => x.OfType<Button>().Class("broadcast-close").Class(state).Template().OfType<ContentPresenter>().Name("PART_ContentPresenter"))
+            {
+                Setters =
+                {
+                    new Setter(ContentPresenter.BackgroundProperty, Brushes.White),
+                    new Setter(ContentPresenter.BorderBrushProperty, Brushes.White),
+                    new Setter(ContentPresenter.ForegroundProperty, closeForeground),
+                },
+            });
+        }
         _close.Click += (_, _) => { _close.IsEnabled = false; _closeRequested.TrySetResult(); };
         var message = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch };
         message.Children.Add(_emoji); message.Children.Add(_body);
