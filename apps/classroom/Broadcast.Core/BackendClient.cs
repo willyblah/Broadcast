@@ -11,13 +11,14 @@ public sealed class BackendException(string message, HttpStatusCode status) : Ex
 }
 public sealed class SessionExpiredException() : Exception("设备登录已失效，请重新绑定");
 
-public sealed class BackendClient(ServiceConfig config, AuthSession? session = null) : IBackend, IDisposable
+// Device sessions stay in memory: a restored disk would otherwise replay an already rotated refresh token.
+public sealed class BackendClient(ServiceConfig config, AuthSession? session = null, DeviceCredential? device = null) : IBackend, IDisposable
 {
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(20) };
     private readonly SemaphoreSlim _refresh = new(1, 1);
     public ServiceConfig Config { get; } = config;
     public AuthSession? Session { get; private set; } = session;
-    public event Action<AuthSession>? SessionChanged;
+    public DeviceCredential? Device { get; } = device;
 
     public async Task LoginAdminAsync(string password, CancellationToken ct = default)
     {
@@ -35,8 +36,8 @@ public sealed class BackendClient(ServiceConfig config, AuthSession? session = n
         await _refresh.WaitAsync(ct);
         try
         {
-            if (Session is null) throw new InvalidOperationException("设备尚未登录");
-            if (Session.ExpiresAt < DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 120)
+            if (Session is null) Session = await SignInDeviceAsync(ct);
+            else if (Session.ExpiresAt < DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 120)
             {
                 try
                 {
@@ -44,12 +45,23 @@ public sealed class BackendClient(ServiceConfig config, AuthSession? session = n
                         new { refresh_token = Session.RefreshToken }, null, ct));
                 }
                 catch (BackendException e) when (e.Status is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
-                { throw new SessionExpiredException(); }
-                SessionChanged?.Invoke(Session);
+                { Session = await SignInDeviceAsync(ct); }
             }
             return Session.AccessToken;
         }
         finally { _refresh.Release(); }
+    }
+
+    private async Task<AuthSession> SignInDeviceAsync(CancellationToken ct)
+    {
+        if (Device is null) throw new SessionExpiredException();
+        try
+        {
+            return Normalize(await RequestAsync<AuthSession>("auth/v1/token?grant_type=password",
+                new { email = Device.Email, password = Device.Password }, null, ct));
+        }
+        catch (BackendException e) when (e.Status is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
+        { throw new SessionExpiredException(); }
     }
 
     public async Task<T> RpcAsync<T>(string name, object input, CancellationToken ct = default) =>

@@ -64,7 +64,9 @@ Deno.serve(async (request) => {
         const deviceAuth = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
         const signedIn = await deviceAuth.auth.signInWithPassword({ email, password });
         if (signedIn.error) throw signedIn.error;
-        return reply({ session: signedIn.data.session, classroom_id: classroom });
+        // Devices restored by DeepFreeze cannot keep rotated refresh tokens, so they sign in with this fixed credential.
+        return reply({ session: signedIn.data.session, classroom_id: classroom,
+          credential: { id: created.data.user.id, email, password } });
       } catch (error) {
         await service.auth.admin.deleteUser(created.data.user.id);
         throw error;

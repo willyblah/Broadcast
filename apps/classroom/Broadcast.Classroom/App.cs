@@ -42,9 +42,9 @@ public sealed class App : Application
             {
                 try
                 {
-                    var session = LocalState.LoadSession();
-                    if (session is not null && _config.IsConfigured) { LocalState.EnableAutoStart(); await StartAsync(session); }
-                    else ShowSettings();
+                    var device = LocalState.LoadDevice();
+                    if (device is not null && _config.IsConfigured) { LocalState.EnableAutoStart(); await StartAsync(device); }
+                    else ShowSettings(notice: LocalState.HasLegacySession ? "程序已更新，需要重新绑定。若班级显示已绑定，请先在老师端的设备管理中解绑。" : null);
                 }
                 catch (Exception e) { LocalState.Log(e); ShowSettings(notice: "设备登录信息无法读取，请重新绑定。"); }
             });
@@ -54,9 +54,9 @@ public sealed class App : Application
     private void ShowSettings(bool exitOnly = false, string? notice = null)
     {
         if (_settings is not null) { _settings.Activate(); return; }
-        _settings = new SetupWindow(_config, _backend?.Session, exitOnly, notice);
+        _settings = new SetupWindow(_config, _backend?.Device, exitOnly, notice);
         _settings.Closed += (_, _) => { _settings = null; if (!_config.IsConfigured && _backend is null) _desktop.Shutdown(); };
-        _settings.Bound += result => Dispatcher.UIThread.Post(async () => await TransitionAsync(() => StartAsync(result.Session)));
+        _settings.Bound += result => Dispatcher.UIThread.Post(async () => await TransitionAsync(() => StartAsync(result.Credential)));
         _settings.Unbound += () => Dispatcher.UIThread.Post(async () => await TransitionAsync(async () => { await StopAsync(); ShowSettings(notice: "已解除绑定，可重新选择班级。"); }));
         _settings.ExitAuthorized += () => Dispatcher.UIThread.Post(async () => await TransitionAsync(async () => { await StopAsync(); _desktop.Shutdown(); }));
         _settings.Show(); _settings.Activate();
@@ -68,19 +68,19 @@ public sealed class App : Application
         catch (Exception e) { LocalState.Log(e); ShowSettings(notice: e.Message); }
         finally { _transition.Release(); }
     }
-    private async Task StartAsync(AuthSession session)
+    private async Task StartAsync(DeviceCredential device)
     {
         await StopAsync();
-        _backend = new BackendClient(_config, session); _backend.SessionChanged += LocalState.SaveSession;
+        _backend = new BackendClient(_config, device: device);
         _speech = new TencentSpeechSynthesizer(_config.Tts);
         var clock = new ServerClock();
-        var outbox = new ReceiptOutbox(Path.Combine(LocalState.Folder, "receipts-" + session.User.Id + ".json"));
+        var outbox = new ReceiptOutbox(Path.Combine(LocalState.Folder, "receipts-" + device.Id + ".json"));
         var queue = new DeliveryQueue(_backend, new BroadcastDisplay(), _speech, new AudioPlayer(), outbox, clock);
         var receiver = new ReceiverService(_backend, queue, outbox, clock);
         receiver.StatusChanged += state => Dispatcher.UIThread.Post(() => { if (_tray is not null) _tray.ToolTipText = "校园广播 · " + state; });
         receiver.Error += LocalState.Log;
         receiver.BindingRevoked += () => Dispatcher.UIThread.Post(async () => await TransitionAsync(async () =>
-        { await StopAsync(); LocalState.ForgetSession(); ShowSettings(notice: "设备已解绑或登录失效，请重新绑定。"); }));
+        { await StopAsync(); LocalState.ForgetDevice(); ShowSettings(notice: "设备已解绑或登录失效，请重新绑定。"); }));
         _receiverLife = CancellationTokenSource.CreateLinkedTokenSource(_appLife.Token);
         _receiverTask = Task.Run(() => receiver.RunAsync(_receiverLife.Token));
     }

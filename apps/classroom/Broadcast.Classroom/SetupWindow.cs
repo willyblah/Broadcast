@@ -11,7 +11,7 @@ namespace Broadcast.Classroom;
 internal sealed class SetupWindow : Window
 {
     private readonly ServiceConfig _config;
-    private readonly AuthSession? _existing;
+    private readonly DeviceCredential? _existing;
     private readonly StackPanel _content = new() { Spacing = 18 };
     private readonly TextBlock _error = new() { Foreground = new SolidColorBrush(Color.Parse("#b42318")), FontSize = 15, TextWrapping = TextWrapping.Wrap };
     private BackendClient? _admin;
@@ -24,7 +24,7 @@ internal sealed class SetupWindow : Window
     public event Action? Unbound;
     public event Action? ExitAuthorized;
 
-    public SetupWindow(ServiceConfig config, AuthSession? existing, bool exitOnly = false, string? notice = null)
+    public SetupWindow(ServiceConfig config, DeviceCredential? existing, bool exitOnly = false, string? notice = null)
     {
         _config = config; _existing = existing; _exitOnly = exitOnly;
         Title = "校园广播 · 教室设置"; Width = 480; Height = 560; MinWidth = 420; MinHeight = 460;
@@ -67,7 +67,7 @@ internal sealed class SetupWindow : Window
     private async Task ShowClassesAsync()
     {
         var state = await _admin!.RpcAsync<ClassroomStatus>("classroom_status", new { }, _life.Token);
-        _currentClass = state.Classrooms.FirstOrDefault(r => r.DeviceId == _existing?.User.Id && r.DeviceId is not null)?.Id;
+        _currentClass = state.Classrooms.FirstOrDefault(r => r.DeviceId == _existing?.Id && r.DeviceId is not null)?.Id;
         _selected = _currentClass;
         _content.Children.Clear(); _content.Children.Add(Heading("选择所属班级"));
         _content.Children.Add(Note("已被其他电脑绑定的班级无法选择。"));
@@ -75,7 +75,7 @@ internal sealed class SetupWindow : Window
         var buttons = new List<Button>();
         foreach (var room in state.Classrooms)
         {
-            var available = room.DeviceId is null || room.DeviceId == _existing?.User.Id;
+            var available = room.DeviceId is null || room.DeviceId == _existing?.Id;
             var button = ActionButton(room.Id + (available ? "" : "  已绑定"));
             button.Margin = new Thickness(4); button.Height = 62; button.IsEnabled = available;
             button.Click += (_, _) => { _selected = room.Id; Paint(); };
@@ -92,10 +92,10 @@ internal sealed class SetupWindow : Window
                 result = await _admin.ApiAsync<RegisteredDevice>(new { action = "register-device", classroom_id = _selected, name = Environment.MachineName }, _life.Token);
             else
             {
-                await _admin.RpcAsync<JsonElement>("bind_device", new { p_device = _existing.User.Id, p_classroom = _selected, p_name = Environment.MachineName }, _life.Token);
+                await _admin.RpcAsync<JsonElement>("bind_device", new { p_device = _existing.Id, p_classroom = _selected, p_name = Environment.MachineName }, _life.Token);
                 result = new RegisteredDevice(_existing, _selected);
             }
-            LocalState.SaveSession(result.Session); LocalState.EnableAutoStart(); Bound?.Invoke(result); Close();
+            LocalState.SaveDevice(result.Credential); LocalState.EnableAutoStart(); Bound?.Invoke(result); Close();
         });
         _content.Children.Add(bind);
         if (_currentClass is not null)
@@ -104,7 +104,7 @@ internal sealed class SetupWindow : Window
             unbind.Click += async (_, _) => await RunAsync(unbind, async () =>
             {
                 await _admin.RpcAsync<JsonElement>("unbind_device", new { p_classroom = _currentClass }, _life.Token);
-                LocalState.ForgetSession(); Unbound?.Invoke(); Close();
+                LocalState.ForgetDevice(); Unbound?.Invoke(); Close();
             });
             _content.Children.Add(unbind);
         }

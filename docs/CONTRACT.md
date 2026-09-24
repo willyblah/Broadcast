@@ -9,7 +9,7 @@
 | action | 其他请求参数 | 结果 |
 | --- | --- | --- |
 | `send` | `request_id`, `body`, `classrooms: string[]`, `teacher_name`, `repeat_count` (0–5), `auto_close`, `emotion`, `voice_type`, 可空 `source_id` | `id` |
-| `register-device` | `classroom_id`, `name` | Supabase `session`, `classroom_id` |
+| `register-device` | `classroom_id`, `name` | Supabase `session`, `classroom_id`, 设备固定登录凭据 `credential`（`id`, `email`, `password`） |
 
 两个操作均仅管理员可用。创建请求以 `request_id` 去重；同一逻辑重试必须保留该 ID，明确重新发送使用新 ID。Edge Function 只发送正文和投递信息，不生成、保存或返回音频。
 

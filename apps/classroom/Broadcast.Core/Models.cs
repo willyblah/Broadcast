@@ -25,7 +25,8 @@ public sealed record ServiceConfig(string SupabaseUrl = "", string SupabaseAnonK
 }
 public sealed record AuthUser(string Id, Dictionary<string, JsonElement> AppMetadata);
 public sealed record AuthSession(string AccessToken, string RefreshToken, long ExpiresAt, AuthUser User, int ExpiresIn = 3600);
-public sealed record RegisteredDevice(AuthSession Session, string ClassroomId);
+public sealed record DeviceCredential(string Id, string Email, string Password);
+public sealed record RegisteredDevice(DeviceCredential Credential, string ClassroomId);
 public sealed record Classroom(string Id, string? DeviceId, string? DeviceName, string? LastSeenAt, bool Connected);
 public sealed record ClassroomStatus(DateTimeOffset ServerNow, Classroom[] Classrooms);
 public sealed record Heartbeat(bool Active, string? ClassroomId, DateTimeOffset ServerNow);

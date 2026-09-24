@@ -30,6 +30,6 @@ EXE 内包含 .NET 和 Avalonia 所需运行文件。首次运行会把原生运
 - 配置文件有变更时退出并重新启动。可使用 `appsettings.local.json` 完整覆盖同目录的基础配置。
 - 配置尚未填写时关闭设置窗口会退出程序；填写后重新打开即可。
 
-Supabase 设备登录凭据使用当前 Windows 用户的 DPAPI 加密，存放在 `%LOCALAPPDATA%\BroadcastClassroom\device.session`。不要复制此文件到其他账号或电脑。腾讯云凭据保存在程序旁的 `appsettings.json`。故障日志为 `%LOCALAPPDATA%\BroadcastClassroom\client.log`；回执暂存文件不包含管理员密码或腾讯云密钥。
+Supabase 设备登录凭据使用当前 Windows 用户的 DPAPI 加密，存放在 `%LOCALAPPDATA%\BroadcastClassroom\device.credential`。该凭据绑定后不再变化，程序每次启动用它登录，因此可以在绑定后开启 DeepFreeze 等还原系统。不要复制此文件到其他账号或电脑。腾讯云凭据保存在程序旁的 `appsettings.json`。故障日志为 `%LOCALAPPDATA%\BroadcastClassroom\client.log`；回执暂存文件不包含管理员密码或腾讯云密钥。
 
 若要卸载，先解绑并退出，然后删除程序目录，并从 Windows“启动应用”禁用 `BroadcastClassroom`。对应自启项位于当前用户注册表 `Software\Microsoft\Windows\CurrentVersion\Run`。

@@ -28,6 +28,10 @@ Deno.serve({ hostname: '127.0.0.1', port: 54329 }, async request => {
   if (url.pathname === '/auth/v1/token') {
     const input = await request.json();
     if (input.refresh_token === 'invalid') return Response.json({ error_description: 'Invalid Refresh Token: Refresh Token Not Found' }, { status: 400 });
+    if (url.searchParams.get('grant_type') === 'password') {
+      if (input.password !== 'device-password') return Response.json({ error_description: 'Invalid login credentials' }, { status: 400 });
+      return Response.json({ access_token: 'device-token', refresh_token: 'device-refresh', expires_in: 3600, user: { id: device, app_metadata: { role: 'device' } } });
+    }
     return Response.json({ access_token: 'rotated-token', refresh_token: 'rotated-refresh', expires_in: 3600, user: { id: device, app_metadata: { role: 'device' } } });
   }
   if (url.pathname === '/stats') return Response.json({ heartbeats });

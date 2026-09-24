@@ -31,6 +31,8 @@ if (args.Contains("--realtime"))
     catch (Exception e) { failed++; Console.WriteLine("FAIL Token refresh: " + e.Message); }
     try { await RefreshSmoke(true); Console.WriteLine("PASS Revoked refresh token requires a new binding"); }
     catch (Exception e) { failed++; Console.WriteLine("FAIL Revoked token: " + e.Message); }
+    try { await DeviceSignInSmoke(); Console.WriteLine("PASS Device credential signs in again after a restored refresh token fails"); }
+    catch (Exception e) { failed++; Console.WriteLine("FAIL Device sign-in: " + e.Message); }
 }
 return failed == 0 ? 0 : 1;
 
@@ -39,14 +41,26 @@ static async Task RefreshSmoke(bool invalid)
     using var backend = new BackendClient(new ServiceConfig("http://127.0.0.1:54329", "fixture-key"),
         new AuthSession("expired", invalid ? "invalid" : "valid-refresh", 1,
             new AuthUser("20000000-0000-4000-8000-000000000001", [])));
-    var updates = 0; backend.SessionChanged += _ => updates++;
     if (invalid)
     {
         try { await backend.AccessTokenAsync(default); } catch (SessionExpiredException) { return; }
         throw new Exception("Expected a session expiry");
     }
     var tokens = await Task.WhenAll(Enumerable.Range(0, 5).Select(_ => backend.AccessTokenAsync(default)));
-    Check(tokens.All(t => t == "rotated-token") && updates == 1 && backend.Session!.RefreshToken == "rotated-refresh");
+    Check(tokens.All(t => t == "rotated-token") && backend.Session!.RefreshToken == "rotated-refresh");
+}
+
+static async Task DeviceSignInSmoke()
+{
+    var config = new ServiceConfig("http://127.0.0.1:54329", "fixture-key");
+    var device = new DeviceCredential("20000000-0000-4000-8000-000000000001", "device@devices.broadcast.invalid", "device-password");
+    using (var fresh = new BackendClient(config, device: device))
+        Check(await fresh.AccessTokenAsync(default) == "device-token" && fresh.Session!.User.Id == device.Id);
+    using (var restored = new BackendClient(config, new AuthSession("expired", "invalid", 1, new AuthUser(device.Id, [])), device))
+        Check(await restored.AccessTokenAsync(default) == "device-token");
+    using var wrong = new BackendClient(config, device: device with { Password = "wrong" });
+    try { await wrong.AccessTokenAsync(default); } catch (SessionExpiredException) { return; }
+    throw new Exception("Expected a session expiry");
 }
 
 static async Task RealtimeSmoke()
